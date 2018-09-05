@@ -1,6 +1,7 @@
 module PortFunnel exposing
     ( Config(..), PortDesc, GenericMessage, EncodeDecode
     , makeConfig, getFunnelCmd, makeSimulatorConfig
+    , makePortDesc, getPortDescName
     , encodeMessage, decodeMessage, encodeBackend, decodeBackend, process
     )
 
@@ -19,6 +20,7 @@ Some very simple JavaScript boilerplate directs `PortFunnel.js` to load and wire
 ## Configuration
 
 @docs makeConfig, getFunnelCmd, makeSimulatorConfig
+@docs makePortDesc, getPortDescName
 
 
 ## API
@@ -48,15 +50,36 @@ type alias EncodeDecode message =
     }
 
 
+type alias PortDescRecord message backend state result =
+    { name : String
+    , messageEncodeDecode : EncodeDecode message
+    , backendEncodeDecode : EncodeDecode backend
+    , process : message -> state -> ( state, result )
+    }
+
+
 {-| Everything we need to know to route one port module's messages.
 -}
-type PortDesc message backend result state
-    = PortDesc
-        { name : String
-        , messageEncodeDecode : EncodeDecode message
-        , backendEncodeDecode : EncodeDecode backend
-        , process : message -> state -> ( state, result )
-        }
+type PortDesc message backend state result
+    = PortDesc (PortDescRecord message backend state result)
+
+
+{-| Make a `PortDesc`.
+
+A module-specific one of these be available from a `PortFunnel`-aware module.
+
+-}
+makePortDesc : String -> EncodeDecode message -> EncodeDecode backend -> (message -> state -> ( state, result )) -> PortDesc message backend state result
+makePortDesc name messageEncodeDecode backendEncodeDecode processor =
+    PortDesc <|
+        PortDescRecord name messageEncodeDecode backendEncodeDecode processor
+
+
+{-| Get the name from a `PortDesc`.
+-}
+getPortDescName : PortDesc message backend state result -> String
+getPortDescName (PortDesc portDesc) =
+    portDesc.name
 
 
 {-| Package up your ports or a simluator.
@@ -105,34 +128,34 @@ makeSimulatorConfig simulator =
 
 {-| Encode a message to a GenericMessage
 -}
-encodeMessage : PortDesc message backend result state -> message -> GenericMessage
+encodeMessage : PortDesc message backend state result -> message -> GenericMessage
 encodeMessage (PortDesc portDesc) message =
     portDesc.messageEncodeDecode.encode message
 
 
 {-| Decode a message from a GenericMessage
 -}
-decodeMessage : PortDesc message backend result state -> GenericMessage -> Result String message
+decodeMessage : PortDesc message backend state result -> GenericMessage -> Result String message
 decodeMessage (PortDesc portDesc) genericMessage =
     portDesc.messageEncodeDecode.decode genericMessage
 
 
 {-| Encode a backend to a GenericMessage
 -}
-encodeBackend : PortDesc message backend result state -> backend -> GenericMessage
+encodeBackend : PortDesc message backend state result -> backend -> GenericMessage
 encodeBackend (PortDesc portDesc) message =
     portDesc.backendEncodeDecode.encode message
 
 
 {-| Decode a backend from a GenericMessage
 -}
-decodeBackend : PortDesc message backend result state -> GenericMessage -> Result String backend
+decodeBackend : PortDesc message backend state result -> GenericMessage -> Result String backend
 decodeBackend (PortDesc portDesc) genericMessage =
     portDesc.backendEncodeDecode.decode genericMessage
 
 
 {-| Process a messsage.
 -}
-process : PortDesc message backend result state -> message -> state -> ( state, result )
+process : PortDesc message backend state result -> message -> state -> ( state, result )
 process (PortDesc portDesc) message state =
     portDesc.process message state

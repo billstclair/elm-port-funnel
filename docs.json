@@ -1,0 +1,93 @@
+[
+  {
+    "name": "PortFunnel",
+    "comment": " PortFunnel allows you to use multiple ports easily.\n\nYou create a single outgoing/incoming pair of ports, and PortFunnel does the rest.\n\nSome very simple JavaScript boilerplate directs `PortFunnel.js` to load and wire up all the other PortFunnel-aware JavaScript files. You write one simple case statement to choose which port package's message is coming in, and then write package-specific code to handle each one.\n\n\n## Types\n\n@docs Config, PortDesc, GenericMessage, EncodeDecode\n\n\n## Configuration\n\n@docs makeConfig, getFunnelCmd, makeSimulatorConfig\n\n\n## API\n\n@docs encodeMessage, decodeMessage, encodeBackend, decodeBackend, process\n\n",
+    "unions": [
+      {
+        "name": "Config",
+        "comment": " Package up your ports or a simluator.\n",
+        "args": [
+          "msg"
+        ],
+        "cases": [
+          [
+            "Config",
+            [
+              "{ funnelCmd : PortFunnel.GenericMessage -> Platform.Cmd.Cmd msg, simulator : Maybe.Maybe (PortFunnel.GenericMessage -> Maybe.Maybe PortFunnel.GenericMessage) }"
+            ]
+          ]
+        ]
+      },
+      {
+        "name": "PortDesc",
+        "comment": " Everything we need to know to route one port module's messages.\n",
+        "args": [
+          "message",
+          "backend",
+          "result",
+          "state"
+        ],
+        "cases": []
+      }
+    ],
+    "aliases": [
+      {
+        "name": "EncodeDecode",
+        "comment": " Bundling up JSON Encoder and Decoder for the specific port types.\n",
+        "args": [
+          "message"
+        ],
+        "type": "{ encode : message -> PortFunnel.GenericMessage, decode : PortFunnel.GenericMessage -> Result.Result String.String message }"
+      },
+      {
+        "name": "GenericMessage",
+        "comment": " A generic message that goes over the wire to/from the port JavaScript.\n",
+        "args": [],
+        "type": "{ portName : String.String, command : String.String, args : List.List ( String.String, Json.Encode.Value ) }"
+      }
+    ],
+    "values": [
+      {
+        "name": "decodeBackend",
+        "comment": " Decode a backend from a GenericMessage\n",
+        "type": "PortFunnel.PortDesc message backend result state -> PortFunnel.GenericMessage -> Result.Result String.String backend"
+      },
+      {
+        "name": "decodeMessage",
+        "comment": " Decode a message from a GenericMessage\n",
+        "type": "PortFunnel.PortDesc message backend result state -> PortFunnel.GenericMessage -> Result.Result String.String message"
+      },
+      {
+        "name": "encodeBackend",
+        "comment": " Encode a backend to a GenericMessage\n",
+        "type": "PortFunnel.PortDesc message backend result state -> backend -> PortFunnel.GenericMessage"
+      },
+      {
+        "name": "encodeMessage",
+        "comment": " Encode a message to a GenericMessage\n",
+        "type": "PortFunnel.PortDesc message backend result state -> message -> PortFunnel.GenericMessage"
+      },
+      {
+        "name": "getFunnelCmd",
+        "comment": " Get the `funnelCmd` from a `Config`, if it has one.\n",
+        "type": "PortFunnel.Config msg -> Maybe.Maybe (PortFunnel.GenericMessage -> Platform.Cmd.Cmd msg)"
+      },
+      {
+        "name": "makeConfig",
+        "comment": " Make a `Config` for a real outgoing port\n",
+        "type": "(PortFunnel.GenericMessage -> Platform.Cmd.Cmd msg) -> PortFunnel.Config msg"
+      },
+      {
+        "name": "makeSimulatorConfig",
+        "comment": " Make a `Config` that enables running your code in `elm reactor`.\n\nThe arg is a port simulator, which translates a message sent to an optional response.\n\n",
+        "type": "(PortFunnel.GenericMessage -> Maybe.Maybe PortFunnel.GenericMessage) -> PortFunnel.Config msg"
+      },
+      {
+        "name": "process",
+        "comment": " Process a messsage.\n",
+        "type": "PortFunnel.PortDesc message backend result state -> message -> state -> ( state, result )"
+      }
+    ],
+    "binops": []
+  }
+]

@@ -19,14 +19,20 @@
 
   function dispatcher(tag, args) {
     function callback() {
-      sub.send('Delayed Greeting');
+      sub.send({ module : moduleName,
+                 tag : "sum",
+                 args: { x: args.x + 1,
+                         y: args.y + 1,
+                         sum: args.x + args.y + 2
+                       }
+               });
     }
 
     setTimeout(callback, 1000);
 
-    return { module: moduleName
-             , tag: tag
-             , args: { x: args.x, y: args.y, sum: args.x + args.y }
+    return { module: moduleName,
+             tag: tag,
+             args: { x: args.x, y: args.y, sum: args.x + args.y }
            }
   }
 })();

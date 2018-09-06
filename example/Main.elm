@@ -26,6 +26,11 @@ port cmdPort : Value -> Cmd msg
 port subPort : (Value -> msg) -> Sub msg
 
 
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    subPort Process
+
+
 type alias State =
     { echo : Echo.State
     , addxy : AddXY.State
@@ -61,11 +66,6 @@ init () =
       }
     , Cmd.none
     )
-
-
-subscriptions : Model -> Sub Msg
-subscriptions model =
-    subPort Process
 
 
 echoInjector : Echo.State -> State -> State

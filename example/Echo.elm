@@ -53,26 +53,21 @@ makeModuleDesc extractor injector =
 
 encode : Message -> GenericMessage
 encode message =
-    GenericMessage moduleName "request" [ ( "string", JE.string message ) ]
+    GenericMessage moduleName "request" <| JE.string message
 
 
 decode : GenericMessage -> Result String Message
 decode { tag, args } =
     case tag of
         "request" ->
-            case PortFunnel.getProp "string" args of
-                Nothing ->
-                    Err "Missing 'string' arg."
+            case JD.decodeValue JD.string args of
+                Ok string ->
+                    Ok string
 
-                Just value ->
-                    case JD.decodeValue JD.string value of
-                        Err _ ->
-                            Err <|
-                                "Echo value not a string: "
-                                    ++ JE.encode 0 value
-
-                        Ok string ->
-                            Ok string
+                Err _ ->
+                    Err <|
+                        "Echo args not a string: "
+                            ++ JE.encode 0 args
 
         _ ->
             Err <| "Unknown Echo tag: " ++ tag

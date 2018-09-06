@@ -10,7 +10,14 @@
 ----------------------------------------------------------------------
 
 
-module Echo exposing (Message, Response(..), State, initialState, moduleDesc)
+module Echo exposing
+    ( Message
+    , Response(..)
+    , State
+    , initialState
+    , moduleDesc
+    , moduleName
+    )
 
 import Json.Decode as JD exposing (Decoder)
 import Json.Encode as JE exposing (Value)
@@ -36,6 +43,8 @@ initialState =
     []
 
 
+{-| The name of this module: "Echo".
+-}
 moduleName : String
 moduleName =
     "Echo"

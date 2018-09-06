@@ -105,14 +105,14 @@ emptyCommander _ _ =
 funnels : Dict String Funnel
 funnels =
     Dict.fromList
-        [ ( "Echo"
+        [ ( Echo.moduleName
           , EchoFunnel <|
                 FunnelSpec echoAccessors
                     Echo.moduleDesc
                     emptyCommander
                     echoHandler
           )
-        , ( "AddXY"
+        , ( AddXY.moduleName
           , AddXYFunnel <|
                 FunnelSpec addxyAccessors
                     AddXY.moduleDesc

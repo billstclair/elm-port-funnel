@@ -10,7 +10,14 @@
 ----------------------------------------------------------------------
 
 
-module AddXY exposing (Message, Response(..), State, initialState, moduleDesc)
+module AddXY exposing
+    ( Message
+    , Response(..)
+    , State
+    , initialState
+    , moduleDesc
+    , moduleName
+    )
 
 import Json.Decode as JD exposing (Decoder)
 import Json.Encode as JE exposing (Value)
@@ -43,6 +50,8 @@ initialState =
     []
 
 
+{-| The name of this module: "AddXY".
+-}
 moduleName : String
 moduleName =
     "AddXY"

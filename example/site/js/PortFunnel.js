@@ -14,7 +14,8 @@
 //
 //   PortFunnel.subscribe
 //     (app, {portnames: ['portFunnelCmd', 'portFunnelSub'],
-//            modules: ['Module1', ...]
+//            modules: ['Module1', ...],
+//            moduleDirectory: 'js/PortFunnel'
 //           });
 //
 // The `ports` property is optional. If included, its value should be a
@@ -22,10 +23,14 @@
 // `app`. They default as specified above.
 //
 // The `modules` property is a list of strings, each of which should
-// correspond to a JavaScript file in the same directory as this file.
-// Each implements the same protocol described in `ExampleModule.js`.
+// correspond to a JavaScript file, which implements the JS side
+// of a PortFunnel-aware Elm module.
 //
-// Each `module` JavaScript file is loaded.
+// The `moduleDirectory` property is a string, giving the path to the
+// directory containing all the module JavaScript files. It is optional,
+// and defaults to 'js/PortFunnel'.
+//
+// When each `module` JavaScript file is loaded.
 // It should set `PortFunnel.modules['moduleName']`, as illustrated in
 // `ExampleModule.js`,so that it can be hooked in to the funnelling
 //  mechanism below.
@@ -46,6 +51,10 @@ function subscribe(app, args) {
   if (!portNames) {
     portNames = ['portFunnelCmd', 'portFunnelSub'];
   }
+  var moduleDirectory = args.moduleDirectory;
+  if (!moduleDirectory) {
+    moduleDirectory = 'js/PortFunnel';
+  }
 
   var ports = app.ports;
   var sub = ports[portNames[1]];
@@ -60,18 +69,18 @@ function subscribe(app, args) {
   var modules = args.modules;
   if (modules) {
     for (var i in modules) {
-      loadModule(modules[i]);
+      loadModule(modules[i], moduleDirectory);
     }
   }
 }
 
-// Load 'modules/'+moduleName+'.js'
+// Load moduleDirectory+'/'+moduleName+'.js'
 // Expect it to set PortFunnel.modules[moduleName].cmd to
 // a function of two args, tag and args.
-function loadModule(moduleName) {
+function loadModule(moduleName, moduleDirectory) {
   PortFunnel.modules[moduleName] = {};
 
-  var src = 'modules/' + moduleName + '.js';
+  var src = moduleDirectory + '/' + moduleName + '.js';
   var script = document.createElement('script');
   script.type = 'text/javascript';
   script.src = src;

@@ -11,9 +11,9 @@
 
 
 module PortFunnel exposing
-    ( ModuleDesc, GenericMessage
+    ( FunnelSpec, ModuleDesc, StateAccessors, GenericMessage
     , makeModuleDesc, getModuleDescName
-    , process, getProp
+    , appProcess, process
     , encodeGenericMessage, decodeGenericMessage
     , genericMessageDecoder
     )
@@ -27,7 +27,7 @@ Some very simple JavaScript boilerplate directs `PortFunnel.js` to load and wire
 
 ## Types
 
-@docs ModuleDesc, GenericMessage
+@docs FunnelSpec, ModuleDesc, StateAccessors, GenericMessage
 
 
 ## PortFunnel-aware Modules
@@ -37,7 +37,7 @@ Some very simple JavaScript boilerplate directs `PortFunnel.js` to load and wire
 
 ## API
 
-@docs process, getProp
+@docs appProcess, process
 
 
 ## Low-level conversion between `Value` and `GenericMessage`
@@ -47,6 +47,7 @@ Some very simple JavaScript boilerplate directs `PortFunnel.js` to load and wire
 
 -}
 
+import Cmd.Extra exposing (addCmd, addCmds, withCmd, withCmds, withNoCmd)
 import Json.Decode as JD exposing (Decoder)
 import Json.Encode as JE exposing (Value)
 import List.Extra as LE
@@ -61,6 +62,12 @@ type alias GenericMessage =
     }
 
 
+type alias StateAccessors state substate =
+    { get : state -> substate
+    , set : substate -> state -> state
+    }
+
+
 {-| A full description of a module to be funneled.
 
 `moduleName` is the name that is passed through the module headed for `<moduleName>.js`.
@@ -70,20 +77,18 @@ type alias GenericMessage =
 `process` does module-specific processing.
 
 -}
-type alias ModuleDescRecord msg message state substate response =
+type alias ModuleDescRecord message substate response =
     { moduleName : String
     , encoder : message -> GenericMessage
     , decoder : GenericMessage -> Result String message
-    , extractor : state -> substate
-    , injector : substate -> state -> state
-    , process : (message -> Cmd msg) -> message -> substate -> ( substate, response )
+    , process : message -> substate -> ( substate, response )
     }
 
 
 {-| Everything we need to know to route one module's messages.
 -}
-type ModuleDesc msg message state substate response
-    = ModuleDesc (ModuleDescRecord msg message state substate response)
+type ModuleDesc message substate response
+    = ModuleDesc (ModuleDescRecord message substate response)
 
 
 {-| Make a `ModuleDesc`.
@@ -91,61 +96,87 @@ type ModuleDesc msg message state substate response
 A module-specific one of these be available from a `PortFunnel`-aware module.
 
 -}
-makeModuleDesc : String -> (message -> GenericMessage) -> (GenericMessage -> Result String message) -> (state -> substate) -> (substate -> state -> state) -> ((message -> Cmd msg) -> message -> substate -> ( substate, response )) -> ModuleDesc msg message state substate response
-makeModuleDesc name encoder decoder extractor injector processor =
+makeModuleDesc : String -> (message -> GenericMessage) -> (GenericMessage -> Result String message) -> (message -> substate -> ( substate, response )) -> ModuleDesc message substate response
+makeModuleDesc name encoder decoder processor =
     ModuleDesc <|
-        ModuleDescRecord name encoder decoder extractor injector processor
+        ModuleDescRecord name encoder decoder processor
 
 
 {-| Get the name from a `ModuleDesc`.
 -}
-getModuleDescName : ModuleDesc msg message state substate response -> String
+getModuleDescName : ModuleDesc message substate response -> String
 getModuleDescName (ModuleDesc moduleDesc) =
     moduleDesc.moduleName
 
 
-{-| Process a message received from your `Sub port`
+{-| All the information needed to use a PortFunnel-aware application
 
-Since that port has a signature of `(Value -> msg) -> Sub msg`, you must first call `encodeGenericMessage` to turn the `Value` into a `GenericMessage`. Then you use the `moduleName` field of the `GenericMessage` to select a `ModuleDesc`.
+with a single PortFunnel-aware module.
 
-See `Main.elm` in the `example` directory for an example of using two PortFunnel-aware modules in one application.
+`StateAccessors` is provided by the application.
+
+`ModuleDesc` is provided by the module, usually via a `moduleDesc` variable.
+
+`commander` is provided by the module, usually via a `commander` variable.
+
+`handler` is provided by the application.
 
 -}
-process : (Value -> Cmd msg) -> ModuleDesc msg message state substate response -> GenericMessage -> state -> Result String ( state, response )
-process cmdPort (ModuleDesc moduleDesc) genericMessage state =
+type alias FunnelSpec state substate message response model msg =
+    { accessors : StateAccessors state substate
+    , moduleDesc : ModuleDesc message substate response
+    , commander : (Value -> Cmd msg) -> response -> Cmd msg
+    , handler : response -> state -> model -> ( model, Cmd msg )
+    }
+
+
+{-| Process a message received from your `Sub port`
+
+This is low-level processing. Most applications will use `appProcess`.
+
+-}
+process : StateAccessors state substate -> ModuleDesc message substate response -> GenericMessage -> state -> Result String ( state, response )
+process accessors (ModuleDesc moduleDesc) genericMessage state =
     case moduleDesc.decoder genericMessage of
         Err err ->
             Err err
 
         Ok message ->
             let
-                messagePort mess =
-                    moduleDesc.encoder mess
-                        |> encodeGenericMessage
-                        |> cmdPort
-
                 substate =
-                    moduleDesc.extractor state
+                    accessors.get state
 
                 ( substate2, response ) =
-                    moduleDesc.process messagePort message substate
+                    moduleDesc.process message substate
             in
             Ok
-                ( moduleDesc.injector substate2 state
+                ( accessors.set substate2 state
                 , response
                 )
 
 
-{-| Look up a property in a list of `(String, property)` pairs.
--}
-getProp : String -> List ( String, a ) -> Maybe a
-getProp name list =
-    case LE.find (\( a, _ ) -> name == a) list of
-        Just ( _, a ) ->
-            Just a
+{-| Once your application has a fully-realized `FunnelSpec` in its hands,
 
-        Nothing ->
-            Nothing
+call this to do all the necessary processing.
+
+-}
+appProcess : (Value -> Cmd msg) -> GenericMessage -> FunnelSpec state substate message response model msg -> state -> model -> Result String ( model, Cmd msg )
+appProcess cmdPort genericMessage funnel state model =
+    case
+        process funnel.accessors funnel.moduleDesc genericMessage state
+    of
+        Err error ->
+            Err error
+
+        Ok ( state2, response ) ->
+            let
+                cmd =
+                    funnel.commander cmdPort response
+
+                ( model2, cmd2 ) =
+                    funnel.handler response state2 model
+            in
+            Ok (model2 |> withCmds [ cmd, cmd2 ])
 
 
 

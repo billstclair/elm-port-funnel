@@ -10,7 +10,7 @@
 ----------------------------------------------------------------------
 
 
-module AddXY exposing (Message, Response(..), State, initialState, makeModuleDesc)
+module AddXY exposing (Message, Response(..), State, initialState, moduleDesc)
 
 import Json.Decode as JD exposing (Decoder)
 import Json.Encode as JE exposing (Value)
@@ -48,14 +48,9 @@ moduleName =
     "AddXY"
 
 
-makeModuleDesc : (state -> State) -> (State -> state -> state) -> ModuleDesc msg Message state State Response
-makeModuleDesc extractor injector =
-    PortFunnel.makeModuleDesc moduleName
-        encode
-        decode
-        extractor
-        injector
-        process
+moduleDesc : ModuleDesc Message State Response
+moduleDesc =
+    PortFunnel.makeModuleDesc moduleName encode decode process
 
 
 encode : Message -> GenericMessage
@@ -119,8 +114,8 @@ decode { tag, args } =
             Err <| "Unknown Echo tag: " ++ tag
 
 
-process : (Message -> Cmd msg) -> Message -> State -> ( State, Response )
-process messagePort message state =
+process : Message -> State -> ( State, Response )
+process message state =
     case message of
         SumMessage sum ->
             ( sum :: state, MessageResponse message )

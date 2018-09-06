@@ -14,10 +14,18 @@ port module Main exposing (main)
 
 import AddXY
 import Browser
+import Cmd.Extra exposing (addCmd, addCmds, withCmd, withCmds, withNoCmd)
+import Dict exposing (Dict)
 import Echo
 import Html exposing (Html, text)
 import Json.Encode as JE exposing (Value)
-import PortFunnel exposing (GenericMessage, ModuleDesc)
+import PortFunnel
+    exposing
+        ( FunnelSpec
+        , GenericMessage
+        , ModuleDesc
+        , StateAccessors
+        )
 
 
 port cmdPort : Value -> Cmd msg
@@ -68,38 +76,64 @@ init () =
     )
 
 
-echoInjector : Echo.State -> State -> State
-echoInjector substate state =
-    { state | echo = substate }
+echoAccessors : StateAccessors State Echo.State
+echoAccessors =
+    StateAccessors .echo (\substate state -> { state | echo = substate })
 
 
-addxyInjector : AddXY.State -> State -> State
-addxyInjector substate state =
-    { state | addxy = substate }
+addxyAccessors : StateAccessors State AddXY.State
+addxyAccessors =
+    StateAccessors .addxy (\substate state -> { state | addxy = substate })
 
 
-echoDesc : ModuleDesc Msg Echo.Message State Echo.State Echo.Response
-echoDesc =
-    Echo.makeModuleDesc .echo echoInjector
+type alias AppFunnel substate message response =
+    FunnelSpec State substate message response Model Msg
 
 
-addxyDesc : ModuleDesc Msg AddXY.Message State AddXY.State AddXY.Response
-addxyDesc =
-    AddXY.makeModuleDesc .addxy addxyInjector
+type Funnel
+    = EchoFunnel (AppFunnel Echo.State Echo.Message Echo.Response)
+    | AddXYFunnel (AppFunnel AddXY.State AddXY.Message AddXY.Response)
+
+
+{-| TODO: add commanders to Echo.elm and AddXY.elm, and use them.
+-}
+emptyCommander : (Value -> Cmd msg) -> response -> Cmd msg
+emptyCommander _ _ =
+    Cmd.none
+
+
+funnels : Dict String Funnel
+funnels =
+    Dict.fromList
+        [ ( "Echo"
+          , EchoFunnel <|
+                FunnelSpec echoAccessors
+                    Echo.moduleDesc
+                    emptyCommander
+                    echoHandler
+          )
+        , ( "AddXY"
+          , AddXYFunnel <|
+                FunnelSpec addxyAccessors
+                    AddXY.moduleDesc
+                    emptyCommander
+                    addXYHandler
+          )
+        ]
 
 
 type Msg
     = Process Value
 
 
-process : ModuleDesc Msg message State substate response -> (response -> State -> Model -> ( Model, Cmd Msg )) -> GenericMessage -> Model -> ( Model, Cmd Msg )
-process moduleDesc processor genericMessage model =
-    case PortFunnel.process cmdPort moduleDesc genericMessage model.state of
+process : GenericMessage -> AppFunnel substate message response -> Model -> ( Model, Cmd Msg )
+process genericMessage funnel model =
+    case PortFunnel.appProcess cmdPort genericMessage funnel model.state model of
         Err error ->
-            ( { model | error = Just error }, Cmd.none )
+            { model | error = Just error } |> withNoCmd
 
-        Ok ( state2, response ) ->
-            processor response state2 { model | error = Nothing }
+        Ok ( model2, cmd ) ->
+            ( model2, cmd )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -108,35 +142,35 @@ update msg model =
         Process value ->
             case PortFunnel.decodeGenericMessage value of
                 Err error ->
-                    ( { model | error = Just error }, Cmd.none )
+                    { model | error = Just error }
+                        |> withNoCmd
 
                 Ok genericMessage ->
-                    case genericMessage.moduleName of
-                        "Echo" ->
-                            process echoDesc
-                                processEcho
-                                genericMessage
-                                model
-
-                        "AddXY" ->
-                            process addxyDesc
-                                processAddxy
-                                genericMessage
-                                model
-
-                        name ->
-                            ( { model
+                    let
+                        moduleName =
+                            genericMessage.moduleName
+                    in
+                    case Dict.get moduleName funnels of
+                        Nothing ->
+                            { model
                                 | error =
-                                    Just <| "Unknown module: " ++ name
-                              }
-                            , Cmd.none
-                            )
+                                    Just ("Unknown moduleName: " ++ moduleName)
+                            }
+                                |> withNoCmd
+
+                        Just funnel ->
+                            case funnel of
+                                EchoFunnel appFunnel ->
+                                    process genericMessage appFunnel model
+
+                                AddXYFunnel appFunnel ->
+                                    process genericMessage appFunnel model
 
 
 {-| TODO: Do something with the response here.
 -}
-processEcho : Echo.Response -> State -> Model -> ( Model, Cmd Msg )
-processEcho response state model =
+echoHandler : Echo.Response -> State -> Model -> ( Model, Cmd Msg )
+echoHandler response state model =
     ( { model | state = state }
     , Cmd.none
     )
@@ -144,8 +178,8 @@ processEcho response state model =
 
 {-| TODO: Do something with the response here.
 -}
-processAddxy : AddXY.Response -> State -> Model -> ( Model, Cmd Msg )
-processAddxy response state model =
+addXYHandler : AddXY.Response -> State -> Model -> ( Model, Cmd Msg )
+addXYHandler response state model =
     ( { model | state = state }
     , Cmd.none
     )

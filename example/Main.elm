@@ -32,6 +32,7 @@ import Element
         , row
         , spacing
         , text
+        , width
         )
 import Element.Border as Border
 import Element.Font as Font exposing (bold, size)
@@ -77,6 +78,8 @@ type alias Model =
     , x : String
     , y : String
     , sum : String
+    , echo : String
+    , echoed : String
     }
 
 
@@ -96,6 +99,8 @@ init () =
       , x = "2"
       , y = "3"
       , sum = ""
+      , echo = "foo"
+      , echoed = ""
       }
     , Cmd.none
     )
@@ -152,6 +157,8 @@ type Msg
     | SetX String
     | SetY String
     | Sum
+    | SetEcho String
+    | Echo
 
 
 process : GenericMessage -> AppFunnel substate message response -> Model -> ( Model, Cmd Msg )
@@ -173,6 +180,9 @@ update msg model =
         SetY y ->
             { model | y = y } |> withNoCmd
 
+        SetEcho echo ->
+            { model | echo = echo } |> withNoCmd
+
         Sum ->
             { model
                 | sum =
@@ -184,6 +194,9 @@ update msg model =
                         ++ model.y
             }
                 |> withNoCmd
+
+        Echo ->
+            { model | echoed = model.echo } |> withNoCmd
 
         Process value ->
             case PortFunnel.decodeGenericMessage value of
@@ -287,22 +300,42 @@ view model =
         (column []
             [ h1 "PortFunnel Example"
             , row []
-                [ inputText [ Element.width (px <| scaled 5) ]
-                    { onChange = SetX
-                    , text = model.x
-                    }
-                , text " x "
-                , inputText [ Element.width (px <| scaled 5) ]
-                    { onChange = SetY
-                    , text = model.y
-                    }
-                , text " "
-                , inputButton
-                    { onPress = Just Sum
-                    , label = text "Sum"
-                    }
+                [ column [ Element.alignTop ]
+                    [ row []
+                        [ inputText [ width (px <| scaled 5) ]
+                            { onChange = SetX
+                            , text = model.x
+                            }
+                        , text " x "
+                        , inputText [ width (px <| scaled 5) ]
+                            { onChange = SetY
+                            , text = model.y
+                            }
+                        , text " "
+                        , inputButton
+                            { onPress = Just Sum
+                            , label = text "Sum"
+                            }
+                        ]
+                    , row [ paddingXY 0 (scaled -2) ]
+                        [ text model.sum ]
+                    ]
+                , column [ width (px <| scaled 5) ] []
+                , column [ Element.alignTop ]
+                    [ row []
+                        [ inputText [ width (px <| scaled 10) ]
+                            { onChange = SetEcho
+                            , text = model.echo
+                            }
+                        , text " "
+                        , inputButton
+                            { onPress = Just Echo
+                            , label = text "Echo"
+                            }
+                        ]
+                    , row [ paddingXY 0 (scaled -2) ]
+                        [ text model.echoed ]
+                    ]
                 ]
-            , row [ paddingXY 0 (scaled -2) ]
-                [ text model.sum ]
             ]
         )

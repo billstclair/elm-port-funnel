@@ -15,9 +15,28 @@ port module Main exposing (main)
 import AddXY
 import Browser
 import Cmd.Extra exposing (addCmd, addCmds, withCmd, withCmds, withNoCmd)
+import Debug exposing (todo)
 import Dict exposing (Dict)
 import Echo
-import Html exposing (Html, text)
+import Element
+    exposing
+        ( Attribute
+        , Element
+        , column
+        , el
+        , none
+        , padding
+        , paddingXY
+        , paragraph
+        , px
+        , row
+        , spacing
+        , text
+        )
+import Element.Border as Border
+import Element.Font as Font exposing (bold, size)
+import Element.Input as Input exposing (Label)
+import Html exposing (Html)
 import Json.Encode as JE exposing (Value)
 import PortFunnel
     exposing
@@ -55,6 +74,9 @@ initialState =
 type alias Model =
     { state : State
     , error : Maybe String
+    , x : String
+    , y : String
+    , sum : String
     }
 
 
@@ -71,6 +93,9 @@ init : () -> ( Model, Cmd Msg )
 init () =
     ( { state = initialState
       , error = Nothing
+      , x = "2"
+      , y = "3"
+      , sum = ""
       }
     , Cmd.none
     )
@@ -124,6 +149,9 @@ funnels =
 
 type Msg
     = Process Value
+    | SetX String
+    | SetY String
+    | Sum
 
 
 process : GenericMessage -> AppFunnel substate message response -> Model -> ( Model, Cmd Msg )
@@ -139,6 +167,24 @@ process genericMessage funnel model =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        SetX x ->
+            { model | x = x } |> withNoCmd
+
+        SetY y ->
+            { model | y = y } |> withNoCmd
+
+        Sum ->
+            { model
+                | sum =
+                    model.x
+                        ++ " + "
+                        ++ model.y
+                        ++ " = "
+                        ++ model.x
+                        ++ model.y
+            }
+                |> withNoCmd
+
         Process value ->
             case PortFunnel.decodeGenericMessage value of
                 Err error ->
@@ -185,6 +231,78 @@ addXYHandler response state model =
     )
 
 
+scaled : Int -> Int
+scaled x =
+    Element.modular 16 1.25 x |> round
+
+
+h1 : String -> Element msg
+h1 str =
+    row
+        [ paddingXY 0 (scaled -1)
+        , bold
+        , size <| scaled 4
+        ]
+        [ text str ]
+
+
+b : String -> Element msg
+b str =
+    el [ bold ] (text str)
+
+
+blankLabel : Label msg
+blankLabel =
+    Input.labelLeft [] none
+
+
+inputText : List (Attribute msg) -> { onChange : String -> msg, text : String } -> Element msg
+inputText attrs r =
+    Input.text (padding (scaled -5) :: attrs)
+        { onChange = r.onChange
+        , text = r.text
+        , label = blankLabel
+        , placeholder = Nothing
+        }
+
+
+inputButton : { onPress : Maybe msg, label : Element msg } -> Element msg
+inputButton body =
+    Input.button
+        [ Border.solid
+        , Border.rounded (scaled -2)
+        , Border.width 2
+        , padding (scaled -6)
+        ]
+        body
+
+
 view : Model -> Html Msg
 view model =
-    text "Hello World!"
+    Element.layout
+        [ paddingXY (scaled -1) 0
+        , size (scaled 1)
+        , spacing (scaled 1)
+        ]
+        (column []
+            [ h1 "PortFunnel Example"
+            , row []
+                [ inputText [ Element.width (px <| scaled 5) ]
+                    { onChange = SetX
+                    , text = model.x
+                    }
+                , text " x "
+                , inputText [ Element.width (px <| scaled 5) ]
+                    { onChange = SetY
+                    , text = model.y
+                    }
+                , text " "
+                , inputButton
+                    { onPress = Just Sum
+                    , label = text "Sum"
+                    }
+                ]
+            , row [ paddingXY 0 (scaled -2) ]
+                [ text model.sum ]
+            ]
+        )

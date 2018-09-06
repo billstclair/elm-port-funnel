@@ -13,7 +13,7 @@
 module PortFunnel exposing
     ( FunnelSpec, ModuleDesc, StateAccessors, GenericMessage
     , makeModuleDesc, getModuleDescName
-    , appProcess, process
+    , send, appProcess, process
     , encodeGenericMessage, decodeGenericMessage
     , genericMessageDecoder
     )
@@ -37,7 +37,7 @@ Some very simple JavaScript boilerplate directs `PortFunnel.js` to load and wire
 
 ## API
 
-@docs appProcess, process
+@docs send, appProcess, process
 
 
 ## Low-level conversion between `Value` and `GenericMessage`
@@ -128,6 +128,14 @@ type alias FunnelSpec state substate message response model msg =
     , commander : (Value -> Cmd msg) -> response -> Cmd msg
     , handler : response -> state -> model -> ( model, Cmd msg )
     }
+
+
+{-| Send a message over a Cmd port.
+-}
+send : (Value -> Cmd msg) -> GenericMessage -> Cmd msg
+send cmdPort message =
+    encodeGenericMessage message
+        |> cmdPort
 
 
 {-| Process a message received from your `Sub port`

@@ -123,6 +123,12 @@ decode { tag, args } =
             Err <| "Unknown Echo tag: " ++ tag
 
 
+send : (Value -> Cmd msg) -> Message -> Cmd msg
+send cmdPort message =
+    encode message
+        |> PortFunnel.send cmdPort
+
+
 process : Message -> State -> ( State, Response )
 process message state =
     case message of

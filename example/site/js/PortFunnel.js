@@ -13,7 +13,7 @@
 // It is an object with a `subscribe` property, a function, called as:
 //
 //   PortFunnel.subscribe
-//     (app, {portnames: ['portFunnelCmd', 'portFunnelSub'],
+//     (app, {portnames: ['cmdPort', 'subPort'],
 //            modules: ['Module1', ...],
 //            moduleDirectory: 'js/PortFunnel'
 //           });
@@ -49,7 +49,7 @@ function subscribe(app, args) {
   if (!args) args = {};
   var portNames = args.portNames;
   if (!portNames) {
-    portNames = ['portFunnelCmd', 'portFunnelSub'];
+    portNames = ['cmdPort', 'subPort'];
   }
   var moduleDirectory = args.moduleDirectory;
   if (!moduleDirectory) {

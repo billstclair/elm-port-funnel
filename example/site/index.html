@@ -33,10 +33,14 @@ var app = Elm[mainModule].init({
 // If you use non-standard names for the ports, you need to name them:
 //
 //   PortFunnel.subscribe(app, {portnames: ['portFunnelCmd', 'portFunnelSub'],
-//                              funnels: ['Echo', ' AddXY']
+//                              modules: ['Echo', ' AddXY']
 //                             });
 //
-PortFunnel.subscribe(app, {funnels: ['Echo', 'AddXY']});
+// You need to change this to a list of the PortFunnel-aware modules used
+// by your application.
+var modules = ['Echo', 'AddXY'];
+
+PortFunnel.subscribe(app, {modules: modules});
     </script>
   </body>
 </html>

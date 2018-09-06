@@ -1,11 +1,13 @@
 module PortFunnel exposing
-    ( Config(..), PortDesc, GenericMessage, EncodeDecode
-    , makeConfig, getFunnelCmd, makeSimulatorConfig
-    , makePortDesc, getPortDescName
-    , encodeMessage, decodeMessage, encodeBackend, decodeBackend, process
+    ( Config, ModuleDesc, GenericMessage
+    , makeConfig, makeSimulatorConfig
+    , makeModuleDesc, getModuleDescName
+    , makeState, process
+    , encodeGenericMessage, decodeGenericMessage
+    , genericMessageDecoder, argsDecoder
     )
 
-{-| PortFunnel allows you to use multiple ports easily.
+{-| PortFunnel allows you easily use multiple port modules.
 
 You create a single outgoing/incoming pair of ports, and PortFunnel does the rest.
 
@@ -14,103 +16,99 @@ Some very simple JavaScript boilerplate directs `PortFunnel.js` to load and wire
 
 ## Types
 
-@docs Config, PortDesc, GenericMessage, EncodeDecode
+@docs Config, ModuleDesc, GenericMessage
 
 
 ## Configuration
 
-@docs makeConfig, getFunnelCmd, makeSimulatorConfig
-@docs makePortDesc, getPortDescName
+@docs makeConfig, makeSimulatorConfig
+@docs makeModuleDesc, getModuleDescName
 
 
 ## API
 
-@docs encodeMessage, decodeMessage, encodeBackend, decodeBackend, process
+@docs makeState, process
+
+
+## Low-level conversion between `Value` and `GenericMessage`
+
+@docs encodeGenericMessage, decodeGenericMessage
+@docs genericMessageDecoder, argsDecoder
 
 -}
 
 import Dict exposing (Dict)
+import Json.Decode as JD exposing (Decoder)
 import Json.Encode as JE exposing (Value)
 
 
-{-| A generic message that goes over the wire to/from the port JavaScript.
+{-| A generic message that goes over the wire to/from the module JavaScript.
 -}
 type alias GenericMessage =
-    { portName : String
-    , command : String
+    { moduleName : String
+    , tag : String
     , args : List ( String, Value )
     }
 
 
-{-| Bundling up JSON Encoder and Decoder for the specific port types.
+{-| A full description of a module to be funneled.
+
+`moduleName` is the name that is passed through the module headed for `<moduleName>.js`.
+
+`encoder` and `decoder` convert between module-specific messages and `GenericMessage`.
+
+`process` does module-specific processing.
+
 -}
-type alias EncodeDecode message =
-    { encode : message -> GenericMessage
-    , decode : GenericMessage -> Result String message
+type alias ModuleDescRecord msg message state result =
+    { moduleName : String
+    , encoder : message -> GenericMessage
+    , decoder : GenericMessage -> Result String message
+    , process : (message -> Cmd msg) -> message -> state -> ( state, result )
     }
 
 
-type alias PortDescRecord message backend state result =
-    { name : String
-    , messageEncodeDecode : EncodeDecode message
-    , backendEncodeDecode : EncodeDecode backend
-    , process : message -> state -> ( state, result )
-    }
-
-
-{-| Everything we need to know to route one port module's messages.
+{-| Everything we need to know to route one module's messages.
 -}
-type PortDesc message backend state result
-    = PortDesc (PortDescRecord message backend state result)
+type ModuleDesc msg message state result
+    = ModuleDesc (ModuleDescRecord msg message state result)
 
 
-{-| Make a `PortDesc`.
+{-| Make a `ModuleDesc`.
 
 A module-specific one of these be available from a `PortFunnel`-aware module.
 
 -}
-makePortDesc : String -> EncodeDecode message -> EncodeDecode backend -> (message -> state -> ( state, result )) -> PortDesc message backend state result
-makePortDesc name messageEncodeDecode backendEncodeDecode processor =
-    PortDesc <|
-        PortDescRecord name messageEncodeDecode backendEncodeDecode processor
+makeModuleDesc : String -> (message -> GenericMessage) -> (GenericMessage -> Result String message) -> ((message -> Cmd msg) -> message -> state -> ( state, result )) -> ModuleDesc msg message state result
+makeModuleDesc name encoder decoder processor =
+    ModuleDesc <|
+        ModuleDescRecord name encoder decoder processor
 
 
-{-| Get the name from a `PortDesc`.
+{-| Get the name from a `ModuleDesc`.
 -}
-getPortDescName : PortDesc message backend state result -> String
-getPortDescName (PortDesc portDesc) =
-    portDesc.name
+getModuleDescName : ModuleDesc msg message state result -> String
+getModuleDescName (ModuleDesc moduleDesc) =
+    moduleDesc.moduleName
 
 
-{-| Package up your ports or a simluator.
+{-| Package up your outgoing port or a simluator.
 -}
 type Config msg
     = Config
-        { funnelCmd : GenericMessage -> Cmd msg
+        { cmdPort : Value -> Cmd msg
         , simulator : Maybe (GenericMessage -> Maybe GenericMessage)
         }
 
 
 {-| Make a `Config` for a real outgoing port
 -}
-makeConfig : (GenericMessage -> Cmd msg) -> Config msg
-makeConfig funnelCmd =
+makeConfig : (Value -> Cmd msg) -> Config msg
+makeConfig cmdPort =
     Config
-        { funnelCmd = funnelCmd
+        { cmdPort = cmdPort
         , simulator = Nothing
         }
-
-
-{-| Get the `funnelCmd` from a `Config`, if it has one.
--}
-getFunnelCmd : Config msg -> Maybe (GenericMessage -> Cmd msg)
-getFunnelCmd (Config config) =
-    case config.simulator of
-        Nothing ->
-            Just config.funnelCmd
-
-        Just _ ->
-            Nothing
 
 
 {-| Make a `Config` that enables running your code in `elm reactor`.
@@ -121,41 +119,110 @@ The arg is a port simulator, which translates a message sent to an optional resp
 makeSimulatorConfig : (GenericMessage -> Maybe GenericMessage) -> Config msg
 makeSimulatorConfig simulator =
     Config
-        { funnelCmd = \_ -> Cmd.none
+        { cmdPort = \_ -> Cmd.none
         , simulator = Just simulator
         }
 
 
-{-| Encode a message to a GenericMessage
+
+--
+-- State for your `Model` and processing input from the `Sub` port.
+--
+
+
+type alias StateRecord msg message state result =
+    { config : Config msg
+    , moduleDesc : ModuleDesc msg message state result
+    , state : state
+    }
+
+
+{-| Encapsulate configuration, module description, and module state.
+
+This is what you store in your Model, and update after calling `process`.
+
 -}
-encodeMessage : PortDesc message backend state result -> message -> GenericMessage
-encodeMessage (PortDesc portDesc) message =
-    portDesc.messageEncodeDecode.encode message
+type State msg message state result
+    = State (StateRecord msg message state result)
 
 
-{-| Decode a message from a GenericMessage
+{-| Make a `State`.
 -}
-decodeMessage : PortDesc message backend state result -> GenericMessage -> Result String message
-decodeMessage (PortDesc portDesc) genericMessage =
-    portDesc.messageEncodeDecode.decode genericMessage
-
-
-{-| Encode a backend to a GenericMessage
--}
-encodeBackend : PortDesc message backend state result -> backend -> GenericMessage
-encodeBackend (PortDesc portDesc) message =
-    portDesc.backendEncodeDecode.encode message
-
-
-{-| Decode a backend from a GenericMessage
--}
-decodeBackend : PortDesc message backend state result -> GenericMessage -> Result String backend
-decodeBackend (PortDesc portDesc) genericMessage =
-    portDesc.backendEncodeDecode.decode genericMessage
+makeState : Config msg -> ModuleDesc msg message state result -> state -> State msg message state result
+makeState config moduleDesc state =
+    State <| StateRecord config moduleDesc state
 
 
 {-| Process a messsage.
 -}
-process : PortDesc message backend state result -> message -> state -> ( state, result )
-process (PortDesc portDesc) message state =
-    portDesc.process message state
+process : message -> State msg message state result -> ( State msg message state result, result )
+process message (State state) =
+    let
+        (Config config) =
+            state.config
+
+        (ModuleDesc moduleDesc) =
+            state.moduleDesc
+
+        messagePort mess =
+            moduleDesc.encoder mess
+                |> encodeGenericMessage
+                |> config.cmdPort
+
+        ( moduleState, result ) =
+            moduleDesc.process messagePort message state.state
+    in
+    ( State { state | state = moduleState }
+    , result
+    )
+
+
+
+--
+-- Low-level conversion between `GenericMessage` and `Value`
+--
+
+
+{-| Low-level GenericMessage encoder.
+-}
+encodeGenericMessage : GenericMessage -> Value
+encodeGenericMessage message =
+    JE.object
+        [ ( "module", JE.string message.moduleName )
+        , ( "tag", JE.string message.tag )
+        , ( "args", JE.object message.args )
+        ]
+
+
+{-| Decoder for a `GenericMessage`.
+-}
+genericMessageDecoder : Decoder GenericMessage
+genericMessageDecoder =
+    JD.map3 GenericMessage
+        (JD.field "module" JD.string)
+        (JD.field "tag" JD.string)
+        (JD.field "args" argsDecoder)
+
+
+{-| Decoder for the `args` in a `GenericMessage`
+-}
+argsDecoder : Decoder (List ( String, Value ))
+argsDecoder =
+    JD.keyValuePairs JD.value
+
+
+{-| Turn a `Value` from the `Sub` port into a `GenericMessage`.
+-}
+decodeGenericMessage : Value -> Result String GenericMessage
+decodeGenericMessage value =
+    decodeValue genericMessageDecoder value
+
+
+decodeValue : Decoder a -> Value -> Result String a
+decodeValue decoder value =
+    case JD.decodeValue decoder value of
+        Ok res ->
+            Ok res
+
+        Err err ->
+            Err <| JD.errorToString err

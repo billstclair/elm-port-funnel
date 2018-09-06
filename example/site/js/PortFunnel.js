@@ -14,20 +14,20 @@
 //
 //   PortFunnel.subscribe
 //     (app, {portnames: ['portFunnelCmd', 'portFunnelSub'],
-//            funnels: ['Funnel1', ...]
+//            modules: ['Module1', ...]
 //           });
 //
 // The `ports` property is optional. If included, its value should be a
 // two-element array containing the name of the `Cmd` and `Sub` ports in
 // `app`. They default as specified above.
 //
-// The `funnels` property is a list of strings, each of which should
+// The `modules` property is a list of strings, each of which should
 // correspond to a JavaScript file in the same directory as this file.
-// Each implements the same protocol described in `ExampleFunnel.js`.
+// Each implements the same protocol described in `ExampleModule.js`.
 //
-// Each `funnel` JavaScript file is loaded.
-// It should set `PortFunnel.funnels['funnelName']`, as illustrated in
-// `ExampleFunnel.js`,so that it can be hooked in to the funnelling
+// Each `module` JavaScript file is loaded.
+// It should set `PortFunnel.modules['moduleName']`, as illustrated in
+// `ExampleModule.js`,so that it can be hooked in to the funnelling
 //  mechanism below.
 //
 //////////////////////////////////////////////////////////////////////
@@ -37,7 +37,7 @@ var PortFunnel = {};
 (function() {
 
 PortFunnel.subscribe = subscribe; // called by HTML file
-PortFunnel.funnels = {};          // funnels[funnelName].cmd set by funnel JS.
+PortFunnel.modules = {};          // modules[funnelName].cmd set by module JS.
 PortFunnel.sub = null;          // set below
 
 function subscribe(app, args) {
@@ -57,21 +57,21 @@ function subscribe(app, args) {
     if (returnValue) sub.send(returnValue);
   });  
 
-  var funnels = args.funnels;
-  if (funnels) {
-    for (var i in funnels) {
-      loadFunnel(funnels[i]);
+  var modules = args.modules;
+  if (modules) {
+    for (var i in modules) {
+      loadModule(modules[i]);
     }
   }
 }
 
-// Load 'funnels/'+funnelName+'.js'
-// Expect it to set PortFunnel.funnels[funnelName].cmd to
+// Load 'modules/'+moduleName+'.js'
+// Expect it to set PortFunnel.modules[moduleName].cmd to
 // a function of two args, tag and args.
-function loadFunnel(funnelName) {
-  PortFunnel.funnels[funnelName] = {};
+function loadModule(moduleName) {
+  PortFunnel.modules[moduleName] = {};
 
-  var src = 'funnels/' + funnelName + '.js';
+  var src = 'modules/' + moduleName + '.js';
   var script = document.createElement('script');
   script.type = 'text/javascript';
   script.src = src;
@@ -80,16 +80,16 @@ function loadFunnel(funnelName) {
 }
 
 // command is of the form:
-//    { funnel: 'funnelName',
-//      tag: 'command name for funnel',
+//    { module: 'moduleName',
+//      tag: 'command name for module',
 //      args: {name: value, ...}
 //    }
 function commandDispatch(command) {
   if (typeof(command) == 'object') {
-    var funnelName = command.funnel;
-    var funnel = funnels[funnelName];
-    if (funnel) {
-      var cmd = funnel.cmd;
+    var moduleName = command.module;
+    var module = modules[moduleName];
+    if (module) {
+      var cmd = module.cmd;
       if (cmd) {
         var tag = command.tag;
         var args = command.args;

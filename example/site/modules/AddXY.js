@@ -12,10 +12,10 @@
 
 
 (function() {
-  var funnelName = 'AddXY';
+  var moduleName = 'AddXY';
   var sub = PortFunnel.sub;
 
-  PortFunnel.funnels[funnelName].cmd = dispatcher;
+  PortFunnel.modules[moduleName].cmd = dispatcher;
 
   function dispatcher(tag, args) {
     function callback() {
@@ -24,7 +24,7 @@
 
     setTimeout(callback, 1000);
 
-    return { funnel: funnelName
+    return { module: moduleName
              , tag: tag
              , args: { x: args.x, y: args.y, sum: args.x + args.y }
            }

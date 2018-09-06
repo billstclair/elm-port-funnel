@@ -11,11 +11,11 @@
 
 
 (function() {
-  var funnelName = 'Echo';
-  PortFunnel.funnels[funnelName].cmd = dispatcher;
+  var moduleName = 'Echo';
+  PortFunnel.modules[moduleName].cmd = dispatcher;
 
   function dispatcher(tag, args) {
-    return { funnel: funnelName,
+    return { module: moduleName,
              tag: tag,
              args: args
            };

@@ -35,7 +35,7 @@ Here's an example from [AddXY.js](example/site/js/PortFunnel/AddXY.js):
         setTimeout(callback, 1000);
 
         return { module: moduleName,
-                 tag: tag,
+                 tag: "sum",
                  args: { x: args.x, y: args.y, sum: args.x + args.y }
                }
       }

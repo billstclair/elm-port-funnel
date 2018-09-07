@@ -8,6 +8,8 @@ On the Elm side, you create the two ports, tell the `PortFunnel` module about th
 
 [developers-guide.md](https://github.com/billstclair/elm-port-funnel/blob/master/developers-guide.md) has details for people who want to write `PortFunnel`-aware modules.
 
+The example is live at https://billstclair.github.io/elm-port-funnel
+
 ## Credit
 
 Thank you to Murphy Randall (@splodingsocks on Twitter and Elm Slack), whose [elm-conf 2017 talk](https://www.youtube.com/watch?v=P3pL85n9_5s) introduced me to the idea that `billstclair/elm-port-funnel` takes to its logical extreme.

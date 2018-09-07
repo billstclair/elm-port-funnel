@@ -57,6 +57,10 @@ There's no way to enforce this, but users will expect your Elm module to expose 
 
 * `moduleName` is your module's name, matching the `.moduleName` of the `GenericMessage` returned by `moduleDesc.encode`.
 
+* `send` encodes a `message` and sends it over a `Cmd` port. Same as `PortFunnel.sendMessage moduleDesc`.
+
 * `toString` converts a `Message` to a pretty string.
 
 * `toJsonString` converts a message to a JSON string. Same as `PortFunnel.messageToJsonString moduleDesc`.
+
+Usually, there will also be functions to make `Message`s, but those are message-specific, so hard to standardize.

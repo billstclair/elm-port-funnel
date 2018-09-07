@@ -15,9 +15,12 @@ module Echo exposing
     , Response(..)
     , State
     , initialState
+    , makeMessage
     , moduleDesc
     , moduleName
+    , send
     , stateToStringList
+    , stateToStrings
     , toJsonString
     , toString
     )
@@ -81,9 +84,8 @@ decode { tag, args } =
 
 
 send : (Value -> Cmd msg) -> Message -> Cmd msg
-send cmdPort message =
-    encode message
-        |> PortFunnel.send cmdPort
+send =
+    PortFunnel.sendMessage moduleDesc
 
 
 process : Message -> State -> ( State, Response )
@@ -109,3 +111,13 @@ toJsonString message =
 stateToStringList : State -> List String
 stateToStringList state =
     state
+
+
+makeMessage : String -> Message
+makeMessage string =
+    string
+
+
+stateToStrings : State -> List String
+stateToStrings state =
+    List.map toJsonString state

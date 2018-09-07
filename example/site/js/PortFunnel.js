@@ -96,13 +96,13 @@ function loadModule(moduleName, moduleDirectory) {
 function commandDispatch(command) {
   if (typeof(command) == 'object') {
     var moduleName = command.module;
-    var module = modules[moduleName];
+    var module = PortFunnel.modules[moduleName];
     if (module) {
       var cmd = module.cmd;
       if (cmd) {
         var tag = command.tag;
         var args = command.args;
-        cmd(tag, args);
+        return cmd(tag, args);
       }
     }
   }

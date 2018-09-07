@@ -10,4 +10,4 @@ On the Elm side, you create the two ports, tell the `PortFunnel` module about th
 
 ## Credit
 
-Thank you to Murphy Randall (@splodingsocks in Elm Slack), whose [elm-conf 2017 talk](https://www.youtube.com/watch?v=P3pL85n9_5s) introduced me to the idea whose logical extreme is `billstclair/elm-port-funnel`.
+Thank you to Murphy Randall (@splodingsocks on Twitter and Elm Slack), whose [elm-conf 2017 talk](https://www.youtube.com/watch?v=P3pL85n9_5s) introduced me to the idea that `billstclair/elm-port-funnel` takes to its logical extreme.

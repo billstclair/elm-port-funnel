@@ -18,12 +18,18 @@
   PortFunnel.modules[moduleName].cmd = dispatcher;
 
   function dispatcher(tag, args) {
+    var returnTag = tag=='add' ? 'sum' : 'product';
+    var operation = tag=='add' ? add : multiply;
+
+    function add(x, y) { return x + y }
+    function multiply(x, y) { return x * y }
+
     function callback() {
       sub.send({ module: moduleName,
-                 tag: "sum",
+                 tag: returnTag,
                  args: { x: args.x + 1,
                          y: args.y + 1,
-                         sum: args.x + args.y + 2
+                         result: operation(args.x + 1, args.y + 1)
                        }
                });
     }
@@ -31,8 +37,10 @@
     setTimeout(callback, 1000);
 
     return { module: moduleName,
-             tag: "sum",
-             args: { x: args.x, y: args.y, sum: args.x + args.y }
+             tag: returnTag,
+             args: { x: args.x,
+                     y: args.y,
+                     result: operation(args.x, args.y) }
            }
   }
 })();

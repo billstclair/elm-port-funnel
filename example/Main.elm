@@ -24,6 +24,7 @@ import Element
         , Element
         , column
         , el
+        , link
         , none
         , padding
         , paddingXY
@@ -77,9 +78,9 @@ type alias Model =
     , error : Maybe String
     , x : String
     , y : String
-    , sum : String
+    , sums : List String
     , echo : String
-    , echoed : String
+    , echoed : List String
     }
 
 
@@ -98,9 +99,9 @@ init () =
       , error = Nothing
       , x = "2"
       , y = "3"
-      , sum = ""
+      , sums = []
       , echo = "foo"
-      , echoed = ""
+      , echoed = []
       }
     , Cmd.none
     )
@@ -157,6 +158,7 @@ type Msg
     | SetX String
     | SetY String
     | Sum
+    | Multiply
     | SetEcho String
     | Echo
 
@@ -169,6 +171,12 @@ process genericMessage funnel model =
 
         Ok ( model2, cmd ) ->
             ( model2, cmd )
+
+
+toInt : Int -> String -> Int
+toInt default string =
+    String.toInt string
+        |> Maybe.withDefault default
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -184,19 +192,21 @@ update msg model =
             { model | echo = echo } |> withNoCmd
 
         Sum ->
-            { model
-                | sum =
-                    model.x
-                        ++ " + "
-                        ++ model.y
-                        ++ " = "
-                        ++ model.x
-                        ++ model.y
-            }
-                |> withNoCmd
+            model
+                |> withCmd
+                    (AddXY.makeAddMessage (toInt 0 model.x) (toInt 0 model.y)
+                        |> AddXY.send cmdPort
+                    )
+
+        Multiply ->
+            model
+                |> withCmd
+                    (AddXY.makeMultiplyMessage (toInt 0 model.x) (toInt 0 model.y)
+                        |> AddXY.send cmdPort
+                    )
 
         Echo ->
-            { model | echoed = model.echo } |> withNoCmd
+            model |> withCmd (Echo.send cmdPort model.echo)
 
         Process value ->
             case PortFunnel.decodeGenericMessage value of
@@ -226,27 +236,50 @@ update msg model =
                                     process genericMessage appFunnel model
 
 
-{-| TODO: Do something with the response here.
--}
 echoHandler : Echo.Response -> State -> Model -> ( Model, Cmd Msg )
 echoHandler response state model =
-    ( { model | state = state }
+    ( { model
+        | state = state
+        , echoed =
+            case response of
+                Echo.MessageResponse message ->
+                    Echo.toString message :: model.echoed
+
+                _ ->
+                    model.echoed
+      }
     , Cmd.none
     )
 
 
-{-| TODO: Do something with the response here.
--}
 addXYHandler : AddXY.Response -> State -> Model -> ( Model, Cmd Msg )
 addXYHandler response state model =
-    ( { model | state = state }
+    ( { model
+        | state = state
+        , sums =
+            case response of
+                AddXY.MessageResponse message ->
+                    AddXY.toString message :: model.sums
+
+                _ ->
+                    model.sums
+      }
     , Cmd.none
     )
+
+
+fontSize : Float
+fontSize =
+    20
 
 
 scaled : Int -> Int
 scaled x =
-    Element.modular 16 1.25 x |> round
+    Element.modular fontSize 1.25 x |> round
+
+
+em x =
+    px (round <| fontSize * x)
 
 
 h1 : String -> Element msg
@@ -290,6 +323,22 @@ inputButton body =
         body
 
 
+edges =
+    { top = 0, right = 0, bottom = 0, left = 0 }
+
+
+bottomPad x =
+    Element.paddingEach { edges | bottom = x }
+
+
+topPad x =
+    Element.paddingEach { edges | top = x }
+
+
+vPad =
+    scaled -4
+
+
 view : Model -> Html Msg
 view model =
     Element.layout
@@ -300,42 +349,118 @@ view model =
         (column []
             [ h1 "PortFunnel Example"
             , row []
-                [ column [ Element.alignTop ]
-                    [ row []
-                        [ inputText [ width (px <| scaled 5) ]
-                            { onChange = SetX
-                            , text = model.x
-                            }
-                        , text " + "
-                        , inputText [ width (px <| scaled 5) ]
-                            { onChange = SetY
-                            , text = model.y
-                            }
-                        , text " "
-                        , inputButton
-                            { onPress = Just Sum
-                            , label = text "Sum"
-                            }
+                [ column [ Element.alignTop ] <|
+                    List.concat
+                        [ [ row [ bottomPad vPad ]
+                                [ inputText [ width (px <| scaled 5) ]
+                                    { onChange = SetX
+                                    , text = model.x
+                                    }
+                                , text " "
+                                , inputText [ width (px <| scaled 5) ]
+                                    { onChange = SetY
+                                    , text = model.y
+                                    }
+                                , text " "
+                                , inputButton
+                                    { onPress = Just Sum
+                                    , label = text "Sum"
+                                    }
+                                , text " "
+                                , inputButton
+                                    { onPress = Just Multiply
+                                    , label = text "Multiply"
+                                    }
+                                ]
+                          ]
+                        , lines model.sums
+                        , [ row [] [ text " " ]
+                          , row
+                                [ bottomPad vPad
+                                ]
+                                [ b "Messages:" ]
+                          ]
+                        , lines <| AddXY.stateToStrings model.state.addxy
                         ]
-                    , row [ paddingXY 0 (scaled -2) ]
-                        [ text model.sum ]
-                    ]
                 , column [ width (px <| scaled 5) ] []
-                , column [ Element.alignTop ]
-                    [ row []
-                        [ inputText [ width (px <| scaled 10) ]
-                            { onChange = SetEcho
-                            , text = model.echo
-                            }
-                        , text " "
-                        , inputButton
-                            { onPress = Just Echo
-                            , label = text "Echo"
-                            }
+                , column [ Element.alignTop ] <|
+                    List.concat
+                        [ [ row [ bottomPad vPad ]
+                                [ inputText [ width (px <| scaled 10) ]
+                                    { onChange = SetEcho
+                                    , text = model.echo
+                                    }
+                                , text " "
+                                , inputButton
+                                    { onPress = Just Echo
+                                    , label = text "Echo"
+                                    }
+                                ]
+                          ]
+                        , lines model.echoed
+                        , [ row [] [ text " " ]
+                          , row
+                                [ bottomPad vPad
+                                ]
+                                [ b "Messages:" ]
+                          ]
+                        , lines <| Echo.stateToStrings model.state.echo
                         ]
-                    , row [ paddingXY 0 (scaled -2) ]
-                        [ text model.echoed ]
+                ]
+            , row [ bottomPad vPad ] [ text "" ]
+            , row
+                [ bottomPad vPad ]
+                [ b "Help:" ]
+            , p
+                [ "Fill in the two numbers and click 'Sum' to add them together,"
+                , " or 'Multiply' to multiply them."
+                , " The AddXY port code will do it a second time,"
+                , " with incremented numbers, a second later."
+                ]
+            , p
+                [ "Click 'Echo' to send the text to its left through the"
+                , " Echo port."
+                ]
+            , p
+                [ "The 'Messages' sections show what is actually received"
+                , " through the Sub port."
+                ]
+            , row [ bottomPad vPad ] [ text "" ]
+            , row [ bottomPad vPad ]
+                [ paragraph []
+                    [ b "Package: "
+                    , link [ Font.underline ]
+                        { url = "https://package.elm-lang.org/packages/billstclair/elm-port-funnel/latest"
+                        , label = text "billstclair/elm-port-funnel"
+                        }
+                    ]
+                ]
+            , row [ bottomPad vPad ]
+                [ paragraph []
+                    [ b "GitHub: "
+                    , link [ Font.underline ]
+                        { url = "https://github.com/billstclair/elm-port-funnel"
+                        , label = text "github.com/billstclair/elm-port-funnel"
+                        }
                     ]
                 ]
             ]
         )
+
+
+p : List String -> Element msg
+p strings =
+    row
+        [ width <| em 40
+        , bottomPad <| round (1.5 * toFloat vPad)
+        ]
+        [ paragraph [] <| List.map text strings ]
+
+
+lines : List String -> List (Element msg)
+lines strings =
+    List.map
+        (\line ->
+            row [] [ text line ]
+        )
+        strings

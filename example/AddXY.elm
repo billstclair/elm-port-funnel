@@ -15,8 +15,12 @@ module AddXY exposing
     , Response(..)
     , State
     , initialState
+    , makeAddMessage
+    , makeMultiplyMessage
     , moduleDesc
     , moduleName
+    , send
+    , stateToStrings
     , toJsonString
     , toString
     )
@@ -26,10 +30,10 @@ import Json.Encode as JE exposing (Value)
 import PortFunnel exposing (GenericMessage, ModuleDesc)
 
 
-type alias Sum =
+type alias Answer =
     { x : Int
     , y : Int
-    , sum : Int
+    , result : Int
     }
 
 
@@ -44,7 +48,9 @@ type Response
 
 type Message
     = AddMessage { x : Int, y : Int }
-    | SumMessage Sum
+    | MultiplyMessage { x : Int, y : Int }
+    | SumMessage Answer
+    | ProductMessage Answer
 
 
 initialState : State
@@ -76,14 +82,33 @@ encode message =
                     , ( "y", JE.int y )
                     ]
 
-        SumMessage { x, y, sum } ->
+        SumMessage { x, y, result } ->
             GenericMessage moduleName
                 "sum"
             <|
                 JE.object
                     [ ( "x", JE.int x )
                     , ( "y", JE.int y )
-                    , ( "sum", JE.int sum )
+                    , ( "result", JE.int result )
+                    ]
+
+        MultiplyMessage { x, y } ->
+            GenericMessage moduleName
+                "multiply"
+            <|
+                JE.object
+                    [ ( "x", JE.int x )
+                    , ( "y", JE.int y )
+                    ]
+
+        ProductMessage { x, y, result } ->
+            GenericMessage moduleName
+                "product"
+            <|
+                JE.object
+                    [ ( "x", JE.int x )
+                    , ( "y", JE.int y )
+                    , ( "result", JE.int result )
                     ]
 
 
@@ -94,12 +119,12 @@ addDecoder =
         (JD.field "y" JD.int)
 
 
-sumDecoder : Decoder Message
-sumDecoder =
-    JD.map3 (\x y sum -> SumMessage { x = x, y = y, sum = sum })
+resultDecoder : (Answer -> Message) -> Decoder Message
+resultDecoder tagger =
+    JD.map3 (\x y result -> tagger { x = x, y = y, result = result })
         (JD.field "x" JD.int)
         (JD.field "y" JD.int)
-        (JD.field "sum" JD.int)
+        (JD.field "result" JD.int)
 
 
 decodeValue : Decoder x -> Value -> Result String x
@@ -119,22 +144,27 @@ decode { tag, args } =
             decodeValue addDecoder args
 
         "sum" ->
-            decodeValue sumDecoder args
+            decodeValue (resultDecoder SumMessage) args
+
+        "product" ->
+            decodeValue (resultDecoder ProductMessage) args
 
         _ ->
             Err <| "Unknown Echo tag: " ++ tag
 
 
 send : (Value -> Cmd msg) -> Message -> Cmd msg
-send cmdPort message =
-    encode message
-        |> PortFunnel.send cmdPort
+send =
+    PortFunnel.sendMessage moduleDesc
 
 
 process : Message -> State -> ( State, Response )
 process message state =
     case message of
-        SumMessage sum ->
+        SumMessage _ ->
+            ( message :: state, MessageResponse message )
+
+        ProductMessage _ ->
             ( message :: state, MessageResponse message )
 
         _ ->
@@ -149,12 +179,24 @@ toString message =
                 ++ " + "
                 ++ String.fromInt y
 
-        SumMessage { x, y, sum } ->
+        SumMessage { x, y, result } ->
             String.fromInt x
                 ++ " + "
                 ++ String.fromInt y
                 ++ " = "
-                ++ String.fromInt sum
+                ++ String.fromInt result
+
+        MultiplyMessage { x, y } ->
+            String.fromInt x
+                ++ " + "
+                ++ String.fromInt y
+
+        ProductMessage { x, y, result } ->
+            String.fromInt x
+                ++ " * "
+                ++ String.fromInt y
+                ++ " = "
+                ++ String.fromInt result
 
 
 toJsonString : Message -> String
@@ -164,6 +206,16 @@ toJsonString message =
         |> JE.encode 0
 
 
-stateToStringList : State -> List String
-stateToStringList state =
+makeAddMessage : Int -> Int -> Message
+makeAddMessage x y =
+    AddMessage { x = x, y = y }
+
+
+makeMultiplyMessage : Int -> Int -> Message
+makeMultiplyMessage x y =
+    MultiplyMessage { x = x, y = y }
+
+
+stateToStrings : State -> List String
+stateToStrings state =
     List.map toJsonString state

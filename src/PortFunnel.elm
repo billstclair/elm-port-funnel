@@ -276,8 +276,7 @@ messageToJsonString moduleDesc message =
 type LoggingWhen
     = NoLogging
     | AllLogging
-    | DebugLogging LoggingWhen
-    | SomeLogging (List String)
+    | TagsLogging (List String)
 
 
 type alias EnableLoggingMessageRecord =
@@ -286,10 +285,26 @@ type alias EnableLoggingMessageRecord =
     }
 
 
-{-| TODO
--}
+
+--
+-- Introspection
+--
+-- TODO, by making the PortFunnel module into a funnel.
+--
+-- This may eventually be a nice addition, but I don't think
+-- it adds enough be worth doing as yet.
+--
+
+
+type alias ApiElement =
+    { moduleName : String
+    , tag : String
+    , args : String
+    }
+
+
 type alias Api =
-    Value
+    List ApiElement
 
 
 type Message

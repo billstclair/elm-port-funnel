@@ -265,3 +265,50 @@ messageToJsonString : ModuleDesc message substate response -> message -> String
 messageToJsonString moduleDesc message =
     messageToValue moduleDesc message
         |> JE.encode 0
+
+
+
+--
+-- The "PortFunnel" funnel.
+--
+
+
+type LoggingWhen
+    = NoLogging
+    | AllLogging
+    | DebugLogging LoggingWhen
+    | SomeLogging (List String)
+
+
+type alias EnableLoggingMessageRecord =
+    { forModule : String
+    , when : LoggingWhen
+    }
+
+
+{-| TODO
+-}
+type alias Api =
+    Value
+
+
+type Message
+    = NoMessage
+    | EnableLoggingMessage EnableLoggingMessageRecord
+    | QueryLoggingMessage
+    | ReportLoggingMessage (List EnableLoggingMessageRecord)
+    | RequestApiMessage String
+    | ReportApiMessage
+        { forModule : String
+        , api : Api
+        }
+    | InstallModuleMesage String
+    | ReportInstallModuleMessage
+        { forModule : String
+        , success : Bool
+        }
+    | RemoveModuleMessage String
+    | ReportRemoveModuleMessage
+        { forModule : String
+        , success : Bool
+        }

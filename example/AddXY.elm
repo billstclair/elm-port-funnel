@@ -37,15 +37,32 @@ type alias Answer =
     }
 
 
+{-| Our internal state.
+
+For the example, this just tracks all incoming messages.
+
+-}
 type alias State =
     List Message
 
 
+{-| A `MessageResponse` encapsulate a message.
+
+`NoResponse` is currently unused, but many PortFunnel-aware modules will need it.
+
+I need to add a `SendMessage` reponse, and add a handler to turn it into a `Cmd`.
+
+-}
 type Response
     = NoResponse
     | MessageResponse Message
 
 
+{-| `AddMessage` and `MultiplyMessage` go out from Elm to the JS.
+
+`SumMessage` and `ProductMessage` come back in.
+
+-}
 type Message
     = AddMessage { x : Int, y : Int }
     | MultiplyMessage { x : Int, y : Int }
@@ -53,6 +70,8 @@ type Message
     | ProductMessage Answer
 
 
+{-| The initial, empty state, so the application can initialize its state.
+-}
 initialState : State
 initialState =
     []
@@ -65,6 +84,8 @@ moduleName =
     "AddXY"
 
 
+{-| Our module descriptor.
+-}
 moduleDesc : ModuleDesc Message State Response
 moduleDesc =
     PortFunnel.makeModuleDesc moduleName encode decode process
@@ -153,6 +174,8 @@ decode { tag, args } =
             Err <| "Unknown Echo tag: " ++ tag
 
 
+{-| Send a `Message` through a `Cmd` port.
+-}
 send : (Value -> Cmd msg) -> Message -> Cmd msg
 send =
     PortFunnel.sendMessage moduleDesc
@@ -171,6 +194,8 @@ process message state =
             ( state, NoResponse )
 
 
+{-| Conver a `Message` to a nice-looking human-readable string.
+-}
 toString : Message -> String
 toString message =
     case message of
@@ -199,6 +224,11 @@ toString message =
                 ++ String.fromInt result
 
 
+{-| Convert a `Message` to the same JSON string that gets sent
+
+over the wire to the JS code.
+
+-}
 toJsonString : Message -> String
 toJsonString message =
     encode message
@@ -206,16 +236,22 @@ toJsonString message =
         |> JE.encode 0
 
 
+{-| Make an `AddMessage`
+-}
 makeAddMessage : Int -> Int -> Message
 makeAddMessage x y =
     AddMessage { x = x, y = y }
 
 
+{-| Make a `MultiplyMessage`
+-}
 makeMultiplyMessage : Int -> Int -> Message
 makeMultiplyMessage x y =
     MultiplyMessage { x = x, y = y }
 
 
+{-| Convert our `State` to a list of strings.
+-}
 stateToStrings : State -> List String
 stateToStrings state =
     List.map toJsonString state

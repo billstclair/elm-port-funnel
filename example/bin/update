@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# Build the example, copy it to my billstclair.github.io project,
+# commit, and push to GitHub.
+# This won't be very useful to anybody but me.
+
+elm make src/Main.elm --output site/index.js
+rsync -av --exclude .gitignore site/ ~/elm/billstclair.github.io/elm-port-funnel/
+cd ~/elm/billstclair.github.io/elm-port-funnel
+git add .
+git commit -am "Update elm-port-funnel example."
+git push
+

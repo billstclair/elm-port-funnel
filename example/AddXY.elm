@@ -11,12 +11,14 @@
 
 
 module AddXY exposing
-    ( Message
+    ( Message(..)
     , Response(..)
     , State
     , initialState
     , moduleDesc
     , moduleName
+    , toJsonString
+    , toString
     )
 
 import Json.Decode as JD exposing (Decoder)
@@ -32,7 +34,7 @@ type alias Sum =
 
 
 type alias State =
-    List Sum
+    List Message
 
 
 type Response
@@ -133,7 +135,35 @@ process : Message -> State -> ( State, Response )
 process message state =
     case message of
         SumMessage sum ->
-            ( sum :: state, MessageResponse message )
+            ( message :: state, MessageResponse message )
 
         _ ->
             ( state, NoResponse )
+
+
+toString : Message -> String
+toString message =
+    case message of
+        AddMessage { x, y } ->
+            String.fromInt x
+                ++ " + "
+                ++ String.fromInt y
+
+        SumMessage { x, y, sum } ->
+            String.fromInt x
+                ++ " + "
+                ++ String.fromInt y
+                ++ " = "
+                ++ String.fromInt sum
+
+
+toJsonString : Message -> String
+toJsonString message =
+    encode message
+        |> PortFunnel.encodeGenericMessage
+        |> JE.encode 0
+
+
+stateToStringList : State -> List String
+stateToStringList state =
+    List.map toJsonString state

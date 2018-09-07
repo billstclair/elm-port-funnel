@@ -19,8 +19,8 @@
 
   function dispatcher(tag, args) {
     function callback() {
-      sub.send({ module : moduleName,
-                 tag : "sum",
+      sub.send({ module: moduleName,
+                 tag: "sum",
                  args: { x: args.x + 1,
                          y: args.y + 1,
                          sum: args.x + args.y + 2

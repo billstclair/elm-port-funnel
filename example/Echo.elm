@@ -17,6 +17,9 @@ module Echo exposing
     , initialState
     , moduleDesc
     , moduleName
+    , stateToStringList
+    , toJsonString
+    , toString
     )
 
 import Json.Decode as JD exposing (Decoder)
@@ -88,3 +91,21 @@ process message state =
     ( message :: state
     , MessageResponse message
     )
+
+
+toString : Message -> String
+toString message =
+    message
+
+
+toJsonString : Message -> String
+toJsonString message =
+    message
+        |> encode
+        |> PortFunnel.encodeGenericMessage
+        |> JE.encode 0
+
+
+stateToStringList : State -> List String
+stateToStringList state =
+    state

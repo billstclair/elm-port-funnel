@@ -306,7 +306,7 @@ view model =
                             { onChange = SetX
                             , text = model.x
                             }
-                        , text " x "
+                        , text " + "
                         , inputText [ width (px <| scaled 5) ]
                             { onChange = SetY
                             , text = model.y

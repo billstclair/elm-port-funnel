@@ -16,6 +16,7 @@ module PortFunnel exposing
     , send, appProcess, process
     , encodeGenericMessage, decodeGenericMessage
     , genericMessageDecoder
+    , messageToValue, messageToJsonString
     )
 
 {-| PortFunnel allows you easily use multiple port modules.
@@ -44,6 +45,7 @@ Some very simple JavaScript boilerplate directs `PortFunnel.js` to load and wire
 
 @docs encodeGenericMessage, decodeGenericMessage
 @docs genericMessageDecoder, argsDecoder
+@docs messageToValue, messageToJsonString
 
 -}
 
@@ -93,7 +95,17 @@ type ModuleDesc message substate response
 
 {-| Make a `ModuleDesc`.
 
-A module-specific one of these be available from a `PortFunnel`-aware module.
+A module-specific one of these is available from a `PortFunnel`-aware module. The args are:
+
+    name encoder decoder processor
+
+`name` is the name of the module, it must match the name of the JS file.
+
+`encoder` turns your custom `Message` type into a `GenericMessage`.
+
+`decoder` turns a `GenericMessage` into your custom message type.
+
+`processor` is called when a message comes in over the subscription port. It's very similar to a standard application `update` function. `substate` is your module's `State` type, not to be confused with `state`, which is the user's application state type.
 
 -}
 makeModuleDesc : String -> (message -> GenericMessage) -> (GenericMessage -> Result String message) -> (message -> substate -> ( substate, response )) -> ModuleDesc message substate response
@@ -229,3 +241,19 @@ decodeValue decoder value =
 
         Err err ->
             Err <| JD.errorToString err
+
+
+{-| Convert a message to a JSON `Value`
+-}
+messageToValue : ModuleDesc message substate response -> message -> Value
+messageToValue (ModuleDesc moduleDesc) message =
+    moduleDesc.encoder message
+        |> encodeGenericMessage
+
+
+{-| Convert a message to a JSON `Value` and encode it as a string.
+-}
+messageToJsonString : ModuleDesc message substate response -> message -> String
+messageToJsonString moduleDesc message =
+    messageToValue moduleDesc message
+        |> JE.encode 0

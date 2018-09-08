@@ -10,6 +10,10 @@ On the Elm side, you create the two ports, tell the `PortFunnel` module about th
 
 The example is live at https://billstclair.github.io/elm-port-funnel
 
+## Existing Funnel Modules
+
+Currently, the `PortFunnel.Echo` and `PortFunnel.AddXY` modules, which ship with `billstclair/elm-port-funnel`, are the only funnel modules. I'll be working on upgrading my existing port packages to funnels (`billstclair/elm-websocket-client`, `billstclair/elm-localstorage`, `billstclair/elm-dev-random`).
+
 ## Credit
 
 Thank you to Murphy Randall (@splodingsocks on Twitter and Elm Slack), whose [elm-conf 2017 talk](https://www.youtube.com/watch?v=P3pL85n9_5s) introduced me to the idea that `billstclair/elm-port-funnel` takes to its logical extreme.

@@ -132,7 +132,7 @@ init () =
       , echo = "foo"
       , echoed = []
       }
-    , Echo.send cmdPort (Echo.makeMessage "ping")
+    , Cmd.none
     )
 
 

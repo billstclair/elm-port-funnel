@@ -6,7 +6,7 @@ On the JavaScript side, you pick a directory for `PortFunnel.js` and the JavaScr
 
 On the Elm side, you create the two ports, tell the `PortFunnel` module about them with a `Config` instance, call the action functions in the funnel modules, in response to events, and dispatch off of the `name` field in the `GenericMessage` you get from your subscription port, to `process` that message in each specific module, and handle its `result`. This is illustrated in [example/Main.elm](https://github.com/billstclair/elm-port-funnel/blob/master/example/Main.elm).
 
-[developers-guide.md](https://github.com/billstclair/elm-port-funnel/blob/master/developers-guide.md) has details for people who want to write funnels. See the files `Echo.elm` and `AddXY.elm` in the `example` directory, and the corresponding `Echo.js` and `AddXY.js` files in the `example/site/js/PortFunnel` directory.
+[developers-guide.md](https://github.com/billstclair/elm-port-funnel/blob/master/developers-guide.md) has details for people who want to write funnels. For simple examples, see the files `Echo.elm` and `AddXY.elm` in the `src/PortFunnel` directory, and the corresponding `Echo.js` and `AddXY.js` files in the `example/site/js/PortFunnel` directory.
 
 The example is live at https://billstclair.github.io/elm-port-funnel
 

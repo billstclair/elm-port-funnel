@@ -39,18 +39,16 @@ type alias Answer =
 
 {-| Our internal state.
 
-For the example, this just tracks all incoming messages.
+Just tracks all incoming messages.
 
 -}
 type alias State =
     List Message
 
 
-{-| A `MessageResponse` encapsulate a message.
+{-| A `MessageResponse` encapsulates a message.
 
 `NoResponse` is currently unused, but many PortFunnel-aware modules will need it.
-
-I need to add a `SendMessage` reponse, and add a handler to turn it into a `Cmd`.
 
 -}
 type Response
@@ -194,7 +192,7 @@ process message state =
             ( state, NoResponse )
 
 
-{-| Conver a `Message` to a nice-looking human-readable string.
+{-| Convert a `Message` to a nice-looking human-readable string.
 -}
 toString : Message -> String
 toString message =

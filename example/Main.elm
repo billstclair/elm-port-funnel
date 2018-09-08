@@ -15,7 +15,6 @@ port module Main exposing (main)
 import AddXY
 import Browser
 import Cmd.Extra exposing (addCmd, addCmds, withCmd, withCmds, withNoCmd)
-import Debug exposing (todo)
 import Dict exposing (Dict)
 import Echo
 import Element
@@ -126,9 +125,7 @@ type Funnel
     | AddXYFunnel (AppFunnel AddXY.State AddXY.Message AddXY.Response)
 
 
-{-| TODO: add commanders to Echo.elm and AddXY.elm, and use them.
--}
-emptyCommander : (Value -> Cmd msg) -> response -> Cmd msg
+emptyCommander : (GenericMessage -> Cmd msg) -> response -> Cmd msg
 emptyCommander _ _ =
     Cmd.none
 
@@ -140,7 +137,7 @@ funnels =
           , EchoFunnel <|
                 FunnelSpec echoAccessors
                     Echo.moduleDesc
-                    emptyCommander
+                    Echo.commander
                     echoHandler
           )
         , ( AddXY.moduleName
@@ -236,6 +233,26 @@ update msg model =
                                     process genericMessage appFunnel model
 
 
+findEchoMessages : List Echo.Response -> List Echo.Message
+findEchoMessages responses =
+    List.foldr
+        (\response res ->
+            case response of
+                Echo.MessageResponse message ->
+                    message :: res
+
+                Echo.ListResponse resps ->
+                    List.append
+                        (findEchoMessages resps)
+                        res
+
+                _ ->
+                    res
+        )
+        []
+        responses
+
+
 echoHandler : Echo.Response -> State -> Model -> ( Model, Cmd Msg )
 echoHandler response state model =
     ( { model
@@ -244,6 +261,13 @@ echoHandler response state model =
             case response of
                 Echo.MessageResponse message ->
                     Echo.toString message :: model.echoed
+
+                Echo.ListResponse responses ->
+                    List.concat
+                        [ Echo.findMessages responses
+                            |> List.map Echo.toString
+                        , model.echoed
+                        ]
 
                 _ ->
                     model.echoed
@@ -419,7 +443,9 @@ view model =
                 ]
             , p
                 [ "Click 'Echo' to send the text to its left through the"
-                , " Echo port."
+                , " Echo port. If the text begins with a dollar sign (\"$\"),"
+                , " The tail, without the dollar sign, will be sent"
+                , " through the port, to illustrate how to do that."
                 ]
             , p
                 [ "The 'Messages' sections show what is actually received"

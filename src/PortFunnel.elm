@@ -137,7 +137,7 @@ with a single PortFunnel-aware module.
 type alias FunnelSpec state substate message response model msg =
     { accessors : StateAccessors state substate
     , moduleDesc : ModuleDesc message substate response
-    , commander : (Value -> Cmd msg) -> response -> Cmd msg
+    , commander : (GenericMessage -> Cmd msg) -> response -> Cmd msg
     , handler : response -> state -> model -> ( model, Cmd msg )
     }
 
@@ -183,6 +183,12 @@ process accessors (ModuleDesc moduleDesc) genericMessage state =
                 )
 
 
+genericMessageToCmdPort : (Value -> Cmd msg) -> GenericMessage -> Cmd msg
+genericMessageToCmdPort cmdPort genericMessage =
+    encodeGenericMessage genericMessage
+        |> cmdPort
+
+
 {-| Once your application has a fully-realized `FunnelSpec` in its hands,
 
 call this to do all the necessary processing.
@@ -199,7 +205,8 @@ appProcess cmdPort genericMessage funnel state model =
         Ok ( state2, response ) ->
             let
                 cmd =
-                    funnel.commander cmdPort response
+                    funnel.commander (genericMessageToCmdPort cmdPort)
+                        response
 
                 ( model2, cmd2 ) =
                     funnel.handler response state2 model

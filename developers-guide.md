@@ -45,22 +45,28 @@ Here's an example from [AddXY.js](example/site/js/PortFunnel/AddXY.js):
 
 There's no way to enforce this, but users will expect your Elm module to expose the following. See the [AddXY.elm](example/AddXY.elm) example.
 
-* `Message(..)` is your message type. Usually fully exposed. But as long as there's a way for users to create and inspect the messages they need to care about, all is good.
+`PortFunnel.Echo` is a funnel that ships with the package, illustrating best practices. The JavaScript for it is in `example/site/js/PortFunnel/Echo.js`. But you can use it in `elm reactor` via its `makeSimulatedCmdPort` function.
+
+* `Message(..)` is your message type. Fully exposed, or not. As long as there's a way for users to create and inspect the messages they need to care about, all is good.
 
 * `Response(..)` is the second value returned by your `moduleDesc` processor function. This is how users get information from the messages received over the subscription port.
 
-* `State` is your module's state type.
-
-* `initialState` is how the user gets the initial value of your module's `State`.
-
-* `moduleDesc` is created with `PortFunnel.makeModuleDesc`.
+* `State` is your funnel's state type. It can be `()` if you don't need state.
 
 * `moduleName` is your module's name, matching the `.moduleName` of the `GenericMessage` returned by `moduleDesc.encode`.
 
+* `moduleDesc` is created with `PortFunnel.makeModuleDesc`.
+
+* `commander` turns a `tagger` and a `response` into a `Cmd`. This is how a funnel sends commands to its own JavaScript.
+
+* `initialState` is how the user gets the initial value of your module's `State`.
+
 * `send` encodes a `message` and sends it over a `Cmd` port. Same as `PortFunnel.sendMessage moduleDesc`.
+
+* `makeSimulatedCmdPort` turns an application tagger (`Value -> Cmd msg`) into a simulated `Cmd` port.
 
 * `toString` converts a `Message` to a pretty string.
 
 * `toJsonString` converts a message to a JSON string. Same as `PortFunnel.messageToJsonString moduleDesc`.
 
-Usually, there will also be functions to make `Message`s, but those are message-specific, so hard to standardize.
+Usually, there will also be functions to make `Message`s, but those are tagger-specific, so hard to standardize.

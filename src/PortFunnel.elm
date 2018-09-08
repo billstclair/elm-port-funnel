@@ -12,11 +12,12 @@
 
 module PortFunnel exposing
     ( FunnelSpec, ModuleDesc, StateAccessors, GenericMessage
-    , makeModuleDesc, getModuleDescName
+    , makeModuleDesc, getModuleDescName, emptyCommander
     , send, sendMessage, appProcess, process
     , encodeGenericMessage, decodeGenericMessage
     , genericMessageDecoder
     , messageToValue, messageToJsonString
+    , makeSimulatedFunnelCmdPort
     )
 
 {-| PortFunnel allows you easily use multiple port modules.
@@ -33,7 +34,7 @@ Some very simple JavaScript boilerplate directs `PortFunnel.js` to load and wire
 
 ## PortFunnel-aware Modules
 
-@docs makeModuleDesc, getModuleDescName
+@docs makeModuleDesc, getModuleDescName, emptyCommander
 
 
 ## API
@@ -44,8 +45,13 @@ Some very simple JavaScript boilerplate directs `PortFunnel.js` to load and wire
 ## Low-level conversion between `Value` and `GenericMessage`
 
 @docs encodeGenericMessage, decodeGenericMessage
-@docs genericMessageDecoder, argsDecoder
+@docs genericMessageDecoder
 @docs messageToValue, messageToJsonString
+
+
+## Simulated Message Processing
+
+@docs makeSimulatedFunnelCmdPort
 
 -}
 
@@ -53,6 +59,7 @@ import Cmd.Extra exposing (addCmd, addCmds, withCmd, withCmds, withNoCmd)
 import Json.Decode as JD exposing (Decoder)
 import Json.Encode as JE exposing (Value)
 import List.Extra as LE
+import Task
 
 
 {-| A generic message that goes over the wire to/from the module JavaScript.
@@ -64,6 +71,8 @@ type alias GenericMessage =
     }
 
 
+{-| Package up an application's functions for accessing one funnel module's state.
+-}
 type alias StateAccessors state substate =
     { get : state -> substate
     , set : substate -> state -> state
@@ -119,6 +128,16 @@ makeModuleDesc name encoder decoder processor =
 getModuleDescName : ModuleDesc message substate response -> String
 getModuleDescName (ModuleDesc moduleDesc) =
     moduleDesc.moduleName
+
+
+{-| A `commander` for a `FunnelSpec` that always returns `Cmd.none`
+
+Useful for funnels that do not send themselves messages.
+
+-}
+emptyCommander : (GenericMessage -> Cmd msg) -> response -> Cmd msg
+emptyCommander _ _ =
+    Cmd.none
 
 
 {-| All the information needed to use a PortFunnel-aware application
@@ -276,7 +295,75 @@ messageToJsonString moduleDesc message =
 
 
 --
+-- Support for simulated ports
+--
+
+
+{-| Simulate a `Cmd` port, outgoing to a funnel's backend.
+
+    makeSimulatedFunnelCmdPort moduleDesc simulator tagger value
+
+Usually, a funnel `Module` will provide one of these by leaving off the last two args, `tagger` and `value`:
+
+    simulator : Message -> Maybe Message
+    simulator message =
+        ...
+
+    makeSimulatedCmdPort : (Value -> msg) -> Value -> Cmd msg
+    makeSimulatedCmdPort =
+        PortFunnel.makeSimulatedFunnelCmdPort
+            moduleDesc
+            simulator
+
+Then the application code will call `simulatedPort` with a tagger, which turns a `Value` into the application `msg` type. That gives something with the same signature, `Value -> Cmd msg` as a `Cmd` port:
+
+    type Msg
+        = Receive Value
+        | ...
+
+    simulatedModuleCmdPort : Value -> Cmd msg
+    simulatedModuleCmdPort =
+        Module.makeSimulatedPort Receive
+
+This can only simulate synchronous message responses, but that's sufficient to test a lot. And it works in `elm reactor`, with no port JavaScript code.
+
+Note that this ignores errors in decoding a `Value` to a `GenericMessage` and from there to a `message`, returning `Cmd.none` if it gets an error from either. Funnel developers will have to test their encoders and decoders separately.
+
+-}
+makeSimulatedFunnelCmdPort : ModuleDesc message substate response -> (message -> Maybe message) -> (Value -> msg) -> Value -> Cmd msg
+makeSimulatedFunnelCmdPort (ModuleDesc moduleDesc) simulator tagger value =
+    case decodeGenericMessage value of
+        Err _ ->
+            Cmd.none
+
+        Ok genericMessage ->
+            case moduleDesc.decoder genericMessage of
+                Err _ ->
+                    Cmd.none
+
+                Ok message ->
+                    case simulator message of
+                        Nothing ->
+                            Cmd.none
+
+                        Just receivedMessage ->
+                            moduleDesc.encoder receivedMessage
+                                |> encodeGenericMessage
+                                |> Task.succeed
+                                |> Task.perform tagger
+
+
+
+--
 -- The "PortFunnel" funnel.
+--
+-- TODO
+--
+-- This may eventually be a nice addition, but I don't think
+-- it adds enough be worth doing as yet.
+--
+-- Logging is probably the first thing I'll add, whenever
+-- I find I need it to debug a funnel in development.
 --
 
 
@@ -290,17 +377,6 @@ type alias EnableLoggingMessageRecord =
     { forModule : String
     , when : LoggingWhen
     }
-
-
-
---
--- Introspection
---
--- TODO, by making the PortFunnel module into a funnel.
---
--- This may eventually be a nice addition, but I don't think
--- it adds enough be worth doing as yet.
---
 
 
 type alias ApiElement =

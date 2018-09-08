@@ -10,21 +10,54 @@
 ----------------------------------------------------------------------
 
 
-module Echo exposing
-    ( Message
-    , Response(..)
-    , State
-    , commander
-    , findMessages
+module PortFunnel.Echo exposing
+    ( Message, Response(..), State
+    , moduleName, moduleDesc, commander
     , initialState
-    , makeMessage
-    , moduleDesc
-    , moduleName
-    , send
-    , stateToStrings
-    , toJsonString
-    , toString
+    , makeMessage, send
+    , toString, toJsonString
+    , makeSimulatedCmdPort
+    , findMessages, stateToStrings
     )
+
+{-| An example echo funnel, with a simulator.
+
+
+# Types
+
+@docs Message, Response, State
+
+
+# Components of a `PortFunnel.FunnelSpec`
+
+@docs moduleName, moduleDesc, commander
+
+
+# Initial `State`
+
+@docs initialState
+
+
+# Sending a `Message` out the `Cmd` Port
+
+@docs makeMessage, send
+
+
+# Conversion to Strings
+
+@docs toString, toJsonString
+
+
+# Simulator
+
+@docs makeSimulatedCmdPort
+
+
+# Non-standard Functions
+
+@docs findMessages, stateToStrings
+
+-}
 
 import Json.Decode as JD exposing (Decoder)
 import Json.Encode as JE exposing (Value)
@@ -158,6 +191,20 @@ commander gfPort response =
 
         _ ->
             Cmd.none
+
+
+simulator : Message -> Maybe Message
+simulator message =
+    Just message
+
+
+{-| Make a simulated `Cmd` port.
+-}
+makeSimulatedCmdPort : (Value -> msg) -> Value -> Cmd msg
+makeSimulatedCmdPort =
+    PortFunnel.makeSimulatedFunnelCmdPort
+        moduleDesc
+        simulator
 
 
 {-| When it needs to send the tail of a message beginning with a dollar

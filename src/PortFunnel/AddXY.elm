@@ -10,20 +10,54 @@
 ----------------------------------------------------------------------
 
 
-module AddXY exposing
-    ( Message(..)
-    , Response(..)
-    , State
+module PortFunnel.AddXY exposing
+    ( Message(..), Response(..), State
+    , moduleName, moduleDesc, commander
     , initialState
-    , makeAddMessage
-    , makeMultiplyMessage
-    , moduleDesc
-    , moduleName
-    , send
+    , makeAddMessage, makeMultiplyMessage, send
+    , toString, toJsonString
+    , makeSimulatedCmdPort
     , stateToStrings
-    , toJsonString
-    , toString
     )
+
+{-| An example add/multiply funnel, with a simulator.
+
+
+# Types
+
+@docs Message, Response, State
+
+
+# Components of a `PortFunnel.FunnelSpec`
+
+@docs moduleName, moduleDesc, commander
+
+
+# Initial `State`
+
+@docs initialState
+
+
+# Sending a `Message` out the `Cmd` Port
+
+@docs makeAddMessage, makeMultiplyMessage, send
+
+
+# Conversion to Strings
+
+@docs toString, toJsonString
+
+
+# Simulator
+
+@docs makeSimulatedCmdPort
+
+
+# Non-standard Functions
+
+@docs stateToStrings
+
+-}
 
 import Json.Decode as JD exposing (Decoder)
 import Json.Encode as JE exposing (Value)
@@ -190,6 +224,40 @@ process message state =
 
         _ ->
             ( state, NoResponse )
+
+
+{-| Responsible for sending a `CmdResponse` back througt the port.
+
+Called by `PortFunnel.appProcess` for each response returned by `process`.
+
+The `AddXY` module doesn't send itself messages, so this is just `PortFunnel.emptyCommander`.
+
+-}
+commander : (GenericMessage -> Cmd msg) -> Response -> Cmd msg
+commander =
+    PortFunnel.emptyCommander
+
+
+simulator : Message -> Maybe Message
+simulator message =
+    case message of
+        AddMessage { x, y } ->
+            Just <| SumMessage (Answer x y (x + y))
+
+        MultiplyMessage { x, y } ->
+            Just <| ProductMessage (Answer x y (x * y))
+
+        _ ->
+            Nothing
+
+
+{-| Make a simulated `Cmd` port.
+-}
+makeSimulatedCmdPort : (Value -> msg) -> Value -> Cmd msg
+makeSimulatedCmdPort =
+    PortFunnel.makeSimulatedFunnelCmdPort
+        moduleDesc
+        simulator
 
 
 {-| Convert a `Message` to a nice-looking human-readable string.

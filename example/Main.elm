@@ -12,11 +12,9 @@
 
 port module Main exposing (main)
 
-import AddXY
 import Browser
 import Cmd.Extra exposing (addCmd, addCmds, withCmd, withCmds, withNoCmd)
 import Dict exposing (Dict)
-import Echo
 import Element
     exposing
         ( Attribute
@@ -46,6 +44,8 @@ import PortFunnel
         , ModuleDesc
         , StateAccessors
         )
+import PortFunnel.AddXY as AddXY
+import PortFunnel.Echo as Echo
 
 
 port cmdPort : Value -> Cmd msg

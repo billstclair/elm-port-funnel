@@ -35,7 +35,9 @@ var portnames = ['cmdPort', 'subPort'];
 
 // PortFunnel.subscribe will load js/PortFunnel/<module>.js,
 // for each module in this list.
-var modules = ['Echo', 'AddXY'];
+// Put `Echo` last, so that its `Startup` message will let you know
+// that all the JavaScript has been loaded.
+var modules = ['AddXY', 'Echo'];
 
 PortFunnel.subscribe(app, {modules: modules});
     </script>

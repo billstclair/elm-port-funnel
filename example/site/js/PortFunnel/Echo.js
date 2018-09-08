@@ -12,7 +12,15 @@
 
 (function() {
   var moduleName = 'Echo';
+  var sub = PortFunnel.sub;
+
   PortFunnel.modules[moduleName].cmd = dispatcher;
+
+  // Let the Elm code know we've started.
+  sub.send({ module: moduleName,
+             tag: "startup",
+             args: null
+           });
 
   function dispatcher(tag, args) {
     return { module: moduleName,

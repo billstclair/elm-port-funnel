@@ -132,7 +132,7 @@ init () =
       , echo = "foo"
       , echoed = []
       }
-    , Cmd.none
+    , Echo.send cmdPort (Echo.makeMessage "ping")
     )
 
 
@@ -258,7 +258,7 @@ update msg model =
         Echo ->
             model
                 |> withCmd
-                    (model.echo
+                    (Echo.makeMessage model.echo
                         |> Echo.send (getEchoCmdPort model)
                     )
 
@@ -284,7 +284,22 @@ update msg model =
                         Just funnel ->
                             case funnel of
                                 EchoFunnel appFunnel ->
-                                    process genericMessage appFunnel model
+                                    let
+                                        wasLoaded =
+                                            Echo.isLoaded model.state.echo
+
+                                        ( mdl, cmd ) =
+                                            process genericMessage appFunnel model
+                                    in
+                                    if
+                                        not wasLoaded
+                                            && Echo.isLoaded mdl.state.echo
+                                    then
+                                        { mdl | useSimulator = False }
+                                            |> withCmd cmd
+
+                                    else
+                                        mdl |> withCmd cmd
 
                                 AddXYFunnel appFunnel ->
                                     process genericMessage appFunnel model

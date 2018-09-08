@@ -11,13 +11,13 @@
 
 
 module PortFunnel.Echo exposing
-    ( Message, Response(..), State
+    ( Message(..), Response(..), State
     , moduleName, moduleDesc, commander
     , initialState
     , makeMessage, send
     , toString, toJsonString
     , makeSimulatedCmdPort
-    , findMessages, stateToStrings
+    , isLoaded, findMessages, stateToStrings
     )
 
 {-| An example echo funnel, with a simulator.
@@ -55,7 +55,7 @@ module PortFunnel.Echo exposing
 
 # Non-standard Functions
 
-@docs findMessages, stateToStrings
+@docs isLoaded, findMessages, stateToStrings
 
 -}
 
@@ -69,8 +69,21 @@ import PortFunnel exposing (GenericMessage, ModuleDesc)
 Just tracks all incoming messages.
 
 -}
-type alias State =
-    List Message
+type State
+    = State
+        { isLoaded : Bool
+        , messages : List Message
+        }
+
+
+{-| Returns true if a `Startup` message has been processed.
+
+This is sent by the port code after it has initialized.
+
+-}
+isLoaded : State -> Bool
+isLoaded (State state) =
+    state.isLoaded
 
 
 {-| A `MessageResponse` encapsulates a message.
@@ -91,15 +104,19 @@ type Response
 
 {-| Since this is a simple echo example, the messages are just strings.
 -}
-type alias Message =
-    String
+type Message
+    = Request String
+    | Startup
 
 
 {-| The initial, empty state, so the application can initialize its state.
 -}
 initialState : State
 initialState =
-    []
+    State
+        { isLoaded = False
+        , messages = []
+        }
 
 
 {-| The name of this module: "Echo".
@@ -118,7 +135,12 @@ moduleDesc =
 
 encode : Message -> GenericMessage
 encode message =
-    GenericMessage moduleName "request" <| JE.string message
+    case message of
+        Request string ->
+            GenericMessage moduleName "request" <| JE.string string
+
+        Startup ->
+            GenericMessage moduleName "startup" JE.null
 
 
 decode : GenericMessage -> Result String Message
@@ -127,12 +149,15 @@ decode { tag, args } =
         "request" ->
             case JD.decodeValue JD.string args of
                 Ok string ->
-                    Ok string
+                    Ok (Request string)
 
                 Err _ ->
                     Err <|
                         "Echo args not a string: "
                             ++ JE.encode 0 args
+
+        "startup" ->
+            Ok Startup
 
         _ ->
             Err <| "Unknown Echo tag: " ++ tag
@@ -146,24 +171,34 @@ send =
 
 
 process : Message -> State -> ( State, Response )
-process message state =
-    let
-        beginsDollar =
-            String.left 1 message == "$"
+process message (State state) =
+    case message of
+        Startup ->
+            ( State { state | isLoaded = True }
+            , NoResponse
+            )
 
-        response =
-            MessageResponse message
-    in
-    ( message :: state
-    , if beginsDollar then
-        ListResponse
-            [ response
-            , CmdResponse <| String.dropLeft 1 message
-            ]
+        Request string ->
+            let
+                beginsDollar =
+                    String.left 1 string == "$"
 
-      else
-        response
-    )
+                response =
+                    MessageResponse message
+            in
+            ( State
+                { state
+                    | messages = message :: state.messages
+                }
+            , if beginsDollar then
+                ListResponse
+                    [ response
+                    , CmdResponse (Request <| String.dropLeft 1 string)
+                    ]
+
+              else
+                response
+            )
 
 
 {-| Responsible for sending a `CmdResponse` back througt the port.
@@ -195,7 +230,12 @@ commander gfPort response =
 
 simulator : Message -> Maybe Message
 simulator message =
-    Just <| message ++ " (simulated)"
+    case message of
+        Request string ->
+            Just (Request <| string ++ " (simulated)")
+
+        Startup ->
+            Nothing
 
 
 {-| Make a simulated `Cmd` port.
@@ -236,7 +276,12 @@ findMessages responses =
 -}
 toString : Message -> String
 toString message =
-    message
+    case message of
+        Request string ->
+            string
+
+        Startup ->
+            "<Startup>"
 
 
 {-| Convert a `Message` to the same JSON string that gets sent
@@ -256,11 +301,11 @@ toJsonString message =
 -}
 makeMessage : String -> Message
 makeMessage string =
-    string
+    Request string
 
 
 {-| Convert our `State` to a list of strings.
 -}
 stateToStrings : State -> List String
-stateToStrings state =
-    List.map toJsonString state
+stateToStrings (State state) =
+    List.map toJsonString state.messages

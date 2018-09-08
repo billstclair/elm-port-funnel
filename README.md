@@ -8,7 +8,7 @@ On the Elm side, you create the two ports, tell the `PortFunnel` module about th
 
 [DEVELOPERS-GUIDE.md](https://github.com/billstclair/elm-port-funnel/blob/master/DEVELOPERS-GUIDE.md) has details for people who want to write funnels. For simple examples, see the files `Echo.elm` and `AddXY.elm` in the `src/PortFunnel` directory, and the corresponding `Echo.js` and `AddXY.js` files in the `example/site/js/PortFunnel` directory.
 
-The example is live at https://billstclair.github.io/elm-port-funnel
+The README in the [example directory](https://github.com/billstclair/elm-port-funnel/tree/master/example) tells you how to configure the JavaScript for your own funnels. The example is live at [billstclair.github.io/elm-port-funnel](https://billstclair.github.io/elm-port-funnel).
 
 ## Existing Funnel Modules
 

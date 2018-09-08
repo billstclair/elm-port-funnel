@@ -59,6 +59,34 @@ subscriptions model =
     subPort Process
 
 
+simulatedEchoCmdPort : Value -> Cmd Msg
+simulatedEchoCmdPort =
+    Echo.makeSimulatedCmdPort Process
+
+
+simulatedAddXYCmdPort : Value -> Cmd Msg
+simulatedAddXYCmdPort =
+    AddXY.makeSimulatedCmdPort Process
+
+
+getEchoCmdPort : Model -> (Value -> Cmd Msg)
+getEchoCmdPort model =
+    if model.useSimulator then
+        simulatedEchoCmdPort
+
+    else
+        cmdPort
+
+
+getAddXYCmdPort : Model -> (Value -> Cmd Msg)
+getAddXYCmdPort model =
+    if model.useSimulator then
+        simulatedAddXYCmdPort
+
+    else
+        cmdPort
+
+
 type alias State =
     { echo : Echo.State
     , addxy : AddXY.State
@@ -75,6 +103,7 @@ initialState =
 type alias Model =
     { state : State
     , error : Maybe String
+    , useSimulator : Bool
     , x : String
     , y : String
     , sums : List String
@@ -96,6 +125,7 @@ init : () -> ( Model, Cmd Msg )
 init () =
     ( { state = initialState
       , error = Nothing
+      , useSimulator = True
       , x = "2"
       , y = "3"
       , sums = []
@@ -152,6 +182,7 @@ funnels =
 
 type Msg
     = Process Value
+    | SetUseSimulator Bool
     | SetX String
     | SetY String
     | Sum
@@ -160,9 +191,28 @@ type Msg
     | Echo
 
 
+getGMCmdPort : GenericMessage -> Model -> (Value -> Cmd Msg)
+getGMCmdPort genericMessage model =
+    let
+        moduleName =
+            genericMessage.moduleName
+    in
+    if moduleName == Echo.moduleName then
+        getEchoCmdPort model
+
+    else
+        getAddXYCmdPort model
+
+
 process : GenericMessage -> AppFunnel substate message response -> Model -> ( Model, Cmd Msg )
 process genericMessage funnel model =
-    case PortFunnel.appProcess cmdPort genericMessage funnel model.state model of
+    case
+        PortFunnel.appProcess (getGMCmdPort genericMessage model)
+            genericMessage
+            funnel
+            model.state
+            model
+    of
         Err error ->
             { model | error = Just error } |> withNoCmd
 
@@ -179,6 +229,9 @@ toInt default string =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        SetUseSimulator useSimulator ->
+            { model | useSimulator = useSimulator } |> withNoCmd
+
         SetX x ->
             { model | x = x } |> withNoCmd
 
@@ -192,18 +245,22 @@ update msg model =
             model
                 |> withCmd
                     (AddXY.makeAddMessage (toInt 0 model.x) (toInt 0 model.y)
-                        |> AddXY.send cmdPort
+                        |> AddXY.send (getAddXYCmdPort model)
                     )
 
         Multiply ->
             model
                 |> withCmd
                     (AddXY.makeMultiplyMessage (toInt 0 model.x) (toInt 0 model.y)
-                        |> AddXY.send cmdPort
+                        |> AddXY.send (getAddXYCmdPort model)
                     )
 
         Echo ->
-            model |> withCmd (Echo.send cmdPort model.echo)
+            model
+                |> withCmd
+                    (model.echo
+                        |> Echo.send (getEchoCmdPort model)
+                    )
 
         Process value ->
             case PortFunnel.decodeGenericMessage value of
@@ -372,6 +429,14 @@ view model =
         ]
         (column []
             [ h1 "PortFunnel Example"
+            , row []
+                [ Input.checkbox [ bottomPad vPad ]
+                    { onChange = SetUseSimulator
+                    , icon = Input.defaultCheckbox
+                    , checked = model.useSimulator
+                    , label = Input.labelLeft [] (text "Use Simulator: ")
+                    }
+                ]
             , row []
                 [ column [ Element.alignTop ] <|
                     List.concat

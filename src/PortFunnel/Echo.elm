@@ -195,7 +195,7 @@ commander gfPort response =
 
 simulator : Message -> Maybe Message
 simulator message =
-    Just message
+    Just <| "simulated: " ++ message
 
 
 {-| Make a simulated `Cmd` port.

@@ -330,7 +330,7 @@ This can only simulate synchronous message responses, but that's sufficient to t
 Note that this ignores errors in decoding a `Value` to a `GenericMessage` and from there to a `message`, returning `Cmd.none` if it gets an error from either. Funnel developers will have to test their encoders and decoders separately.
 
 -}
-makeSimulatedFunnelCmdPort : ModuleDesc message substate response -> (message -> Maybe message) -> (Value -> msg) -> Value -> Cmd msg
+makeSimulatedFunnelCmdPort : ModuleDesc message substate response -> (message -> Maybe message) -> (Value -> msg) -> (Value -> Cmd msg)
 makeSimulatedFunnelCmdPort (ModuleDesc moduleDesc) simulator tagger value =
     case decodeGenericMessage value of
         Err _ ->

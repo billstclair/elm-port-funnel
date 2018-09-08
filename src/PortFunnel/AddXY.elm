@@ -64,6 +64,12 @@ import Json.Encode as JE exposing (Value)
 import PortFunnel exposing (GenericMessage, ModuleDesc)
 
 
+type alias Question =
+    { x : Int
+    , y : Int
+    }
+
+
 type alias Answer =
     { x : Int
     , y : Int
@@ -96,8 +102,8 @@ type Response
 
 -}
 type Message
-    = AddMessage { x : Int, y : Int }
-    | MultiplyMessage { x : Int, y : Int }
+    = AddMessage Question
+    | MultiplyMessage Question
     | SumMessage Answer
     | ProductMessage Answer
 
@@ -165,9 +171,9 @@ encode message =
                     ]
 
 
-addDecoder : Decoder Message
-addDecoder =
-    JD.map2 (\x y -> AddMessage { x = x, y = y })
+addDecoder : (Question -> Message) -> Decoder Message
+addDecoder tagger =
+    JD.map2 (\x y -> tagger { x = x, y = y })
         (JD.field "x" JD.int)
         (JD.field "y" JD.int)
 
@@ -194,7 +200,10 @@ decode : GenericMessage -> Result String Message
 decode { tag, args } =
     case tag of
         "add" ->
-            decodeValue addDecoder args
+            decodeValue (addDecoder AddMessage) args
+
+        "multiply" ->
+            decodeValue (addDecoder MultiplyMessage) args
 
         "sum" ->
             decodeValue (resultDecoder SumMessage) args
@@ -203,14 +212,15 @@ decode { tag, args } =
             decodeValue (resultDecoder ProductMessage) args
 
         _ ->
-            Err <| "Unknown Echo tag: " ++ tag
+            Err <| "Unknown AddXY tag: " ++ tag
 
 
 {-| Send a `Message` through a `Cmd` port.
 -}
 send : (Value -> Cmd msg) -> Message -> Cmd msg
-send =
-    PortFunnel.sendMessage moduleDesc
+send tagger message =
+    PortFunnel.sendMessage moduleDesc tagger <|
+        message
 
 
 process : Message -> State -> ( State, Response )

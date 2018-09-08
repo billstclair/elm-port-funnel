@@ -185,7 +185,7 @@ type Msg
     | SetUseSimulator Bool
     | SetX String
     | SetY String
-    | Sum
+    | Add
     | Multiply
     | SetEcho String
     | Echo
@@ -241,7 +241,7 @@ update msg model =
         SetEcho echo ->
             { model | echo = echo } |> withNoCmd
 
-        Sum ->
+        Add ->
             model
                 |> withCmd
                     (AddXY.makeAddMessage (toInt 0 model.x) (toInt 0 model.y)
@@ -452,8 +452,8 @@ view model =
                                     }
                                 , text " "
                                 , inputButton
-                                    { onPress = Just Sum
-                                    , label = text "Sum"
+                                    { onPress = Just Add
+                                    , label = text "Add"
                                     }
                                 , text " "
                                 , inputButton
@@ -501,7 +501,7 @@ view model =
                 [ bottomPad vPad ]
                 [ b "Help:" ]
             , p
-                [ "Fill in the two numbers and click 'Sum' to add them together,"
+                [ "Fill in the two numbers and click 'Add' to add them together,"
                 , " or 'Multiply' to multiply them."
                 , " The AddXY port code will do it a second time,"
                 , " with incremented numbers, a second later."

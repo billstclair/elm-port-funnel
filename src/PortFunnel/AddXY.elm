@@ -218,9 +218,8 @@ decode { tag, args } =
 {-| Send a `Message` through a `Cmd` port.
 -}
 send : (Value -> Cmd msg) -> Message -> Cmd msg
-send tagger message =
-    PortFunnel.sendMessage moduleDesc tagger <|
-        message
+send =
+    PortFunnel.sendMessage moduleDesc
 
 
 process : Message -> State -> ( State, Response )

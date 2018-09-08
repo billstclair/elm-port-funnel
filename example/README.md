@@ -85,3 +85,12 @@ If you need to pass a flag to your top-level `init` function, add it to the `ini
 You may want to include the `Echo` module, even though you have no need for it, because after its JavaScript loads, it sends an `Echo.Startup` message, which makes `Echo.isLoaded` return `True`, so that you can tell if there is a real backend and that it loaded successfully. The example application uses this to initialize the state of its "Use Simulator" checkbox.
 
 The `PortFunnel.subscribe(...)` call loads the `modules` and hooks them up to `app.pots`. If you use a different module for your ports than your top-level module, you'll need to change that.
+
+## Adding a Funnel
+
+The reason I created the `billstclair/elm-port-funnel` package is that adding a new funnel to an existing setup becomes very easy.
+
+On the JavaScript side, you drop the new funnel's JavaScript file into the `site/js/PortFunnel' directory, and add its name to the `modules` array in `site/index.html`.
+
+On the Elm side, you import the new module, add its initial state to your funnel state, create a new `StateAccessors` instance to access the new module's state from your funnel state, make a new simulated port, add the new funnel type to `Funnel`, and `funnels`, send the relevant funnel messages in response to application `Msg`s, and write a handler for the incoming messages from the new funnel. The last two steps are the hardest, and you'd have to do those no matter which port technology you use.
+

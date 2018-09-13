@@ -1,7 +1,8 @@
 ----------------------------------------------------------------------
 --
--- boilerplate.elm
--- Boilerplate that you'll need to use any PortFunnel funnel module.
+-- simple.elm
+-- Boilerplate for a port-only PortFunnel-using application.
+-- This is boilerplate.elm with the simulation support removed.
 -- Copyright (c) 2018 Bill St. Clair <billstclair@gmail.com>
 -- Some rights reserved.
 -- Distributed under the MIT License
@@ -12,10 +13,13 @@
 
 port module Main exposing (main)
 
-{-| This is an example PortFunnel application file.
+{-| This is a bare-bones PortFunnel application.
 
-It will run, in `elm reactor`, or from `site/index.html`, when compiled
-into `site/elm.js` (with, e.g., the `bin/build-boilerplate` script).
+It will display an interface in `elm reactor`, but won't do anything.
+
+To get it to work, you need to compile it into `site/elm.js` (with,
+e.g., the `bin/build-simple` script, and then aim your browser at
+`site/index.html`.
 
 -}
 
@@ -56,32 +60,6 @@ or nothing sent back from the port JavaScript will get to your code.
 subscriptions : Model -> Sub Msg
 subscriptions model =
     subPort Process
-
-
-{-| Support for simulators.
-
-You'll need something like this for each module you want to be able to simulate.
-
-Totally optional, but I find it nice to be able to simulator in `elm reactor`.
-
--}
-simulatedEchoCmdPort : Value -> Cmd Msg
-simulatedEchoCmdPort =
-    Echo.makeSimulatedCmdPort Process
-
-
-{-| You may want simulator use to be automatic.
-
-If so, keep a `useSimulator` flag in your `Model`, and check it here.
-
--}
-getEchoCmdPort : Model -> (Value -> Cmd Msg)
-getEchoCmdPort model =
-    if model.useSimulator then
-        simulatedEchoCmdPort
-
-    else
-        cmdPort
 
 
 {-| You need to store the state of each module you use.
@@ -151,25 +129,6 @@ funnels =
         ]
 
 
-{-| Turn the `moduleName` inside a `GenericMessage` into the port
-
-to which to send its messages. This only needs to be here if you're
-doing simulation. Otherwise, just use the real `cmdPort`.
-
--}
-getGMCmdPort : GenericMessage -> Model -> (Value -> Cmd Msg)
-getGMCmdPort genericMessage model =
-    let
-        moduleName =
-            genericMessage.moduleName
-    in
-    if moduleName == Echo.moduleName then
-        getEchoCmdPort model
-
-    else
-        cmdPort
-
-
 {-| After the `Echo` module processes a `GenericMessage` into an `Echo.Response`,
 
 this function is called to do something with that response.
@@ -211,7 +170,7 @@ passes them through to the module-specific functions in the `AppFunnel`.
 process : GenericMessage -> AppFunnel substate message response -> Model -> ( Model, Cmd Msg )
 process genericMessage funnel model =
     case
-        PortFunnel.appProcess (getGMCmdPort genericMessage model)
+        PortFunnel.appProcess cmdPort
             genericMessage
             funnel
             model.state
@@ -235,33 +194,7 @@ processFunnel genericMessage funnel model =
     -- This example has only one possibility.
     case funnel of
         EchoFunnel appFunnel ->
-            let
-                wasLoaded =
-                    Echo.isLoaded model.state.echo
-
-                ( mdl, cmd ) =
-                    process genericMessage appFunnel model
-            in
-            if
-                not wasLoaded
-                    && Echo.isLoaded mdl.state.echo
-            then
-                -- If the `Echo` module was not loaded before this
-                -- message came in, and the message changed that, then
-                -- turn the simulator off. The `Startup` message
-                -- happens only once, right after the JavaScript for
-                -- the module is loaded.
-                -- Real code will likely just assume that the ports
-                -- are OK, and use them, or wire in use of the simulator
-                -- during development.
-                -- `PortModule.js` queues up messages that arrive before
-                -- the associated module JS code has loaded.
-                ( { mdl | useSimulator = False }
-                , cmd
-                )
-
-            else
-                ( mdl, cmd )
+            process genericMessage appFunnel model
 
 
 {-| Called from `update` to process a `Value` from the `subPort`.
@@ -296,7 +229,6 @@ processValue value model =
 
 `state` contains the port module state.
 `error` is used to report parsing and processing errors.
-`useSimulator` controls whether we use the simulator(s) or the real port.
 `echo` is the value in the text box next to the `Echo` button.
 `echoed` is a list of strings that have been echoed, most recent first.
 
@@ -304,7 +236,6 @@ processValue value model =
 type alias Model =
     { state : State
     , error : Maybe String
-    , useSimulator : Bool
     , echo : String
     , echoed : List String
     }
@@ -323,7 +254,6 @@ init : () -> ( Model, Cmd Msg )
 init () =
     ( { state = initialState
       , error = Nothing
-      , useSimulator = True
       , echo = "foo"
       , echoed = []
       }
@@ -338,7 +268,6 @@ All the others are application specific.
 -}
 type Msg
     = Process Value
-    | SetUseSimulator Bool
     | SetEcho String
     | Echo
 
@@ -352,9 +281,6 @@ update msg modl =
             { modl | error = Nothing }
     in
     case msg of
-        SetUseSimulator useSimulator ->
-            ( { model | useSimulator = useSimulator }, Cmd.none )
-
         SetEcho echo ->
             ( { model
                 | echo = echo
@@ -371,7 +297,7 @@ update msg modl =
         Echo ->
             ( model
             , Echo.makeMessage model.echo
-                |> Echo.send (getEchoCmdPort model)
+                |> Echo.send cmdPort
             )
 
         Process value ->
@@ -394,15 +320,7 @@ view model =
                 p [ style "color" "red" ]
                     [ text err ]
         , p []
-            [ text "Use simulator: "
-            , input
-                [ type_ "checkbox"
-                , onCheck SetUseSimulator
-                , checked model.useSimulator
-                ]
-                []
-            , br
-            , input
+            [ input
                 [ value model.echo
                 , onInput SetEcho
                 ]

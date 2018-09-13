@@ -1,0 +1,3 @@
+#!/bin/bash
+
+elm make simple.elm --output site/elm.js

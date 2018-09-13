@@ -142,11 +142,8 @@ funnels : Dict String Funnel
 funnels =
     Dict.fromList
         [ ( Echo.moduleName
-          , EchoFunnel <|
-                FunnelSpec echoAccessors
-                    Echo.moduleDesc
-                    Echo.commander
-                    echoHandler
+          , FunnelSpec echoAccessors Echo.moduleDesc Echo.commander echoHandler
+                |> EchoFunnel
           )
         ]
 

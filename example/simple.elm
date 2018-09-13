@@ -15,7 +15,8 @@ port module Main exposing (main)
 
 {-| This is a bare-bones PortFunnel application.
 
-It will display an interface in `elm reactor`, but won't do anything.
+It will display an interface in `elm reactor`, but won't do anything,
+since it has no support for simulators, so requires the ports.
 
 To get it to work, you need to compile it into `site/elm.js` (with,
 e.g., the `bin/build-simple` script, and then aim your browser at
@@ -26,8 +27,8 @@ e.g., the `bin/build-simple` script, and then aim your browser at
 import Browser
 import Dict exposing (Dict)
 import Html exposing (Html, button, div, h1, input, p, span, text)
-import Html.Attributes exposing (checked, style, type_, value)
-import Html.Events exposing (onCheck, onClick, onInput)
+import Html.Attributes exposing (style, value)
+import Html.Events exposing (onClick, onInput)
 import Json.Encode as JE exposing (Value)
 import PortFunnel
     exposing
@@ -120,11 +121,8 @@ funnels : Dict String Funnel
 funnels =
     Dict.fromList
         [ ( Echo.moduleName
-          , EchoFunnel <|
-                FunnelSpec echoAccessors
-                    Echo.moduleDesc
-                    Echo.commander
-                    echoHandler
+          , FunnelSpec echoAccessors Echo.moduleDesc Echo.commander echoHandler
+                |> EchoFunnel
           )
         ]
 
@@ -170,11 +168,7 @@ passes them through to the module-specific functions in the `AppFunnel`.
 process : GenericMessage -> AppFunnel substate message response -> Model -> ( Model, Cmd Msg )
 process genericMessage funnel model =
     case
-        PortFunnel.appProcess cmdPort
-            genericMessage
-            funnel
-            model.state
-            model
+        PortFunnel.appProcess cmdPort genericMessage funnel model.state model
     of
         Err error ->
             ( { model | error = Just error }, Cmd.none )

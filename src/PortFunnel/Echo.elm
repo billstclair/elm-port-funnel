@@ -247,9 +247,9 @@ makeSimulatedCmdPort =
         simulator
 
 
-{-| When it needs to send the tail of a message beginning with a dollar
+{-| When it needs to send the tail of a message beginning with a dollar sign
 
-sign through the port, the `Echo` module returns a `ListResponse`. This function recursively descends a ListResponse, and returns a list of the `Message`s from any `MessageResponse`s it finds.
+through the port, the `Echo` module returns a `ListResponse`. This function recursively descends a ListResponse, and returns a list of the `Message`s from any `MessageResponse`s it finds.
 
 -}
 findMessages : List Response -> List Message

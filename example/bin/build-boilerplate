@@ -1,0 +1,3 @@
+#!/bin/bash
+
+elm make boilerplate.elm --output site/elm.js

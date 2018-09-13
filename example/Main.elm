@@ -132,7 +132,8 @@ init () =
       , echo = "foo"
       , echoed = []
       }
-    , Cmd.none
+    , Echo.makeMessage "If you see this, startup queueing is working."
+        |> Echo.send cmdPort
     )
 
 
@@ -296,7 +297,14 @@ update msg model =
                                             && Echo.isLoaded mdl.state.echo
                                     then
                                         { mdl | useSimulator = False }
-                                            |> withCmd cmd
+                                            |> withCmds
+                                                [ cmd
+
+                                                -- Test that this gets queued
+                                                , Echo.makeMessage
+                                                    "This should happen second."
+                                                    |> Echo.send cmdPort
+                                                ]
 
                                     else
                                         mdl |> withCmd cmd

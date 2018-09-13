@@ -38,15 +38,15 @@ The [site](site/) directory is laid out as follows (ignoring development files t
 
     elm make Main.elm --output site/elm.js
     
-It also loads `js/PortFunnel.js`, which contains the top-level initialization and dispatch code through which every request from Elm is funneled:
+It also loads `js/PortFunnel.js`, which contains the top-level initialization and dispatch code through which every request from Elm is funneled (the `<script>` close tags below are misspelled as `<!/script>` to avoid tickling an Elm markup bug):
 
       <head>
         <title>PortFunnel Example</title>
         <!-- Compile your Elm application into index.js. E.g.:
           -- elm make src/Main.elm --output site/elm.js
           -->
-        <script type='text/javascript' src='elm.js'></script>
-        <script type='text/javascript' src='js/PortFunnel.js'></script>
+        <script type='text/javascript' src='elm.js'><!/script>
+        <script type='text/javascript' src='js/PortFunnel.js'><!/script>
       </head>
 
 `index.html` contains the following JavaScript to initialize Elm in a `<div>` and load the `PortFunnel` funnels:

@@ -3,7 +3,7 @@
     "name": "billstclair/elm-port-funnel",
     "summary": "Using one port pair for ALL compatible port code.",
     "license": "MIT",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "exposed-modules": [
         "PortFunnel",
         "PortFunnel.Echo",

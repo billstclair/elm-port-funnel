@@ -48,17 +48,36 @@ import PortFunnel.AddXY as AddXY
 import PortFunnel.Echo as Echo
 
 
+{-| Here's where you define your ports.
+
+You can name them something besides `cmdPort` and `subPort`,
+but then you have to change the call to `PortFunnel.subscribe()`
+in `site/index.html`. Why bother?
+
+If you run the application in `elm reactor`, these will go nowhere.
+
+-}
 port cmdPort : Value -> Cmd msg
 
 
 port subPort : (Value -> msg) -> Sub msg
 
 
+{-| You may have other subscriptions, but you need at least this one,
+or nothing sent back from the port JavaScript will get to your code.
+-}
 subscriptions : Model -> Sub Msg
 subscriptions model =
     subPort Process
 
 
+{-| Support for simulators.
+
+You'll need something like this for each module you want to be able to simulate.
+
+Totally optional, but I find it nice to be able to simulator in `elm reactor`.
+
+-}
 simulatedEchoCmdPort : Value -> Cmd Msg
 simulatedEchoCmdPort =
     Echo.makeSimulatedCmdPort Process
@@ -69,6 +88,11 @@ simulatedAddXYCmdPort =
     AddXY.makeSimulatedCmdPort Process
 
 
+{-| You may want simulator use to be automatic.
+
+If so, keep a `useSimulator` flag in your `Model`, and check it here.
+
+-}
 getEchoCmdPort : Model -> (Value -> Cmd Msg)
 getEchoCmdPort model =
     if model.useSimulator then
@@ -87,12 +111,22 @@ getAddXYCmdPort model =
         cmdPort
 
 
+{-| You need to store the state of each module you use.
+-}
 type alias State =
     { echo : Echo.State
     , addxy : AddXY.State
     }
 
 
+{-| And you need to initialize that state.
+
+Some modules have parmeters to their `initialState` functions.
+
+In that case, you may have to delay this packaging until you know the
+values for those parameters.
+
+-}
 initialState : State
 initialState =
     { echo = Echo.initialState
@@ -100,6 +134,239 @@ initialState =
     }
 
 
+{-| `StateAccessors`, `FunnelSpec`, `ModuleDesc`, `commander`, and handlers
+
+are all packaged up for each port module, and indexed so they can
+be easily looked up by `moduleName` when messages come in from the
+subscription port.
+
+The `ModuleDesc` and `commander` are usually exposed by each port module. The others are defined by your application.
+
+Here are the `StateAccessors` for the `Echo` module.
+
+-}
+echoAccessors : StateAccessors State Echo.State
+echoAccessors =
+    StateAccessors .echo (\substate state -> { state | echo = substate })
+
+
+{-| And for the `AddXY` module.
+-}
+addxyAccessors : StateAccessors State AddXY.State
+addxyAccessors =
+    StateAccessors .addxy (\substate state -> { state | addxy = substate })
+
+
+{-| An `AppFunnel` is a `FunnelSpec` with the `state`, `model`, and `msg` made concrete.
+-}
+type alias AppFunnel substate message response =
+    FunnelSpec State substate message response Model Msg
+
+
+{-| A `Funnel` tags a module-specific `FunnelSpec`,
+
+with all the variable types made concrete.
+
+-}
+type Funnel
+    = EchoFunnel (AppFunnel Echo.State Echo.Message Echo.Response)
+    | AddXYFunnel (AppFunnel AddXY.State AddXY.Message AddXY.Response)
+
+
+{-| Finally, a `Dict` mapping `moduleName` to tagged concrete `FunnelSpec`.
+-}
+funnels : Dict String Funnel
+funnels =
+    Dict.fromList
+        [ ( Echo.moduleName
+          , EchoFunnel <|
+                FunnelSpec echoAccessors
+                    Echo.moduleDesc
+                    Echo.commander
+                    echoHandler
+          )
+        , ( AddXY.moduleName
+          , AddXYFunnel <|
+                FunnelSpec addxyAccessors
+                    AddXY.moduleDesc
+                    AddXY.commander
+                    addXYHandler
+          )
+        ]
+
+
+{-| Turn the `moduleName` inside a `GenericMessage` into the port
+
+to which to send its messages. This only needs to be here if you're
+doing simulation. Otherwise, just use the real `cmdPort`.
+
+-}
+getGMCmdPort : GenericMessage -> Model -> (Value -> Cmd Msg)
+getGMCmdPort genericMessage model =
+    let
+        moduleName =
+            genericMessage.moduleName
+    in
+    if moduleName == Echo.moduleName then
+        getEchoCmdPort model
+
+    else
+        getAddXYCmdPort model
+
+
+{-| After the `Echo` module processes a `GenericMessage` into an `Echo.Response`,
+
+this function is called to do something with that response.
+
+You'll need a separate handler function for each port module.
+
+-}
+echoHandler : Echo.Response -> State -> Model -> ( Model, Cmd Msg )
+echoHandler response state model =
+    ( { model
+        | state = state
+        , echoed =
+            case response of
+                Echo.MessageResponse message ->
+                    Echo.toString message :: model.echoed
+
+                Echo.ListResponse responses ->
+                    List.concat
+                        [ Echo.findMessages responses
+                            |> List.map Echo.toString
+                        , model.echoed
+                        ]
+
+                _ ->
+                    model.echoed
+      }
+    , Cmd.none
+    )
+
+
+{-| Here's the handler for message from the AddXY module's JavaScript.
+-}
+addXYHandler : AddXY.Response -> State -> Model -> ( Model, Cmd Msg )
+addXYHandler response state model =
+    ( { model
+        | state = state
+        , sums =
+            case response of
+                AddXY.MessageResponse message ->
+                    AddXY.toString message :: model.sums
+
+                _ ->
+                    model.sums
+      }
+    , Cmd.none
+    )
+
+
+{-| After parsing the `Value` that comes in to `update` with the `Process` msg,
+
+This function passes the module-specific `cmdPort` and `FunnelSpec` (`AppFunnel`)
+into `PortFunnel` for processing. Note that `substate`, `message`, and `response`
+can all be type variables here, because `PortFunnel.appProcess` just
+passes them through to the module-specific functions in the `AppFunnel`.
+
+-}
+process : GenericMessage -> AppFunnel substate message response -> Model -> ( Model, Cmd Msg )
+process genericMessage funnel model =
+    case
+        PortFunnel.appProcess (getGMCmdPort genericMessage model)
+            genericMessage
+            funnel
+            model.state
+            model
+    of
+        Err error ->
+            { model | error = Just error } |> withNoCmd
+
+        Ok ( model2, cmd ) ->
+            ( model2, cmd )
+
+
+{-| Here when we've parsed the incoming `GenericMessage`,
+
+and have found the `Funnel` for the module that will process it.
+
+-}
+processFunnel : GenericMessage -> Funnel -> Model -> ( Model, Cmd Msg )
+processFunnel genericMessage funnel model =
+    -- Dispatch on the `Funnel` type.
+    -- This example has only one possibility.
+    case funnel of
+        EchoFunnel appFunnel ->
+            let
+                wasLoaded =
+                    Echo.isLoaded model.state.echo
+
+                ( mdl, cmd ) =
+                    process genericMessage appFunnel model
+            in
+            if
+                not wasLoaded
+                    && Echo.isLoaded mdl.state.echo
+            then
+                { mdl | useSimulator = False }
+                    |> withCmds
+                        [ cmd
+
+                        -- Test that this gets queued behind
+                        -- "If you see this, startup queueing is working."
+                        -- sent by `init` below.
+                        , Echo.makeMessage
+                            "This should happen second."
+                            |> Echo.send cmdPort
+                        ]
+
+            else
+                mdl |> withCmd cmd
+
+        -- Many modules send a `Startup` message to notify the Elm code.
+        -- You only need to use one of those for the simulator determination.
+        AddXYFunnel appFunnel ->
+            process genericMessage appFunnel model
+
+
+{-| Called from `update` to process a `Value` from the `subPort`.
+-}
+processValue : Value -> Model -> ( Model, Cmd Msg )
+processValue value model =
+    -- Parse the incoming `Value` into a `GenericMessage`.
+    case PortFunnel.decodeGenericMessage value of
+        Err error ->
+            { model | error = Just error }
+                |> withNoCmd
+
+        Ok genericMessage ->
+            let
+                moduleName =
+                    genericMessage.moduleName
+            in
+            case Dict.get moduleName funnels of
+                Nothing ->
+                    { model
+                        | error =
+                            Just ("Unknown moduleName: " ++ moduleName)
+                    }
+                        |> withNoCmd
+
+                Just funnel ->
+                    processFunnel genericMessage funnel model
+
+
+{-| Our model.
+
+`state` contains the port module state.
+`error` is used to report parsing and processing errors.
+`useSimulator` controls whether we use the simulator(s) or the real port.
+`x` and `y` are the inputs for the `AddXY` module.
+`sums` is a list of its outputs.
+`echo` is the input for the `Echo` module.
+`echoed` is a list of its outputs.
+
+-}
 type alias Model =
     { state : State
     , error : Maybe String
@@ -137,50 +404,11 @@ init () =
     )
 
 
-echoAccessors : StateAccessors State Echo.State
-echoAccessors =
-    StateAccessors .echo (\substate state -> { state | echo = substate })
+{-| The `Process` message handles messages coming in from the subscription port.
 
+All the others are application specific.
 
-addxyAccessors : StateAccessors State AddXY.State
-addxyAccessors =
-    StateAccessors .addxy (\substate state -> { state | addxy = substate })
-
-
-type alias AppFunnel substate message response =
-    FunnelSpec State substate message response Model Msg
-
-
-type Funnel
-    = EchoFunnel (AppFunnel Echo.State Echo.Message Echo.Response)
-    | AddXYFunnel (AppFunnel AddXY.State AddXY.Message AddXY.Response)
-
-
-emptyCommander : (GenericMessage -> Cmd msg) -> response -> Cmd msg
-emptyCommander _ _ =
-    Cmd.none
-
-
-funnels : Dict String Funnel
-funnels =
-    Dict.fromList
-        [ ( Echo.moduleName
-          , EchoFunnel <|
-                FunnelSpec echoAccessors
-                    Echo.moduleDesc
-                    Echo.commander
-                    echoHandler
-          )
-        , ( AddXY.moduleName
-          , AddXYFunnel <|
-                FunnelSpec addxyAccessors
-                    AddXY.moduleDesc
-                    emptyCommander
-                    addXYHandler
-          )
-        ]
-
-
+-}
 type Msg
     = Process Value
     | SetUseSimulator Bool
@@ -192,35 +420,6 @@ type Msg
     | Echo
 
 
-getGMCmdPort : GenericMessage -> Model -> (Value -> Cmd Msg)
-getGMCmdPort genericMessage model =
-    let
-        moduleName =
-            genericMessage.moduleName
-    in
-    if moduleName == Echo.moduleName then
-        getEchoCmdPort model
-
-    else
-        getAddXYCmdPort model
-
-
-process : GenericMessage -> AppFunnel substate message response -> Model -> ( Model, Cmd Msg )
-process genericMessage funnel model =
-    case
-        PortFunnel.appProcess (getGMCmdPort genericMessage model)
-            genericMessage
-            funnel
-            model.state
-            model
-    of
-        Err error ->
-            { model | error = Just error } |> withNoCmd
-
-        Ok ( model2, cmd ) ->
-            ( model2, cmd )
-
-
 toInt : Int -> String -> Int
 toInt default string =
     String.toInt string
@@ -230,6 +429,9 @@ toInt default string =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        Process value ->
+            processValue value model
+
         SetUseSimulator useSimulator ->
             { model | useSimulator = useSimulator } |> withNoCmd
 
@@ -263,115 +465,13 @@ update msg model =
                         |> Echo.send (getEchoCmdPort model)
                     )
 
-        Process value ->
-            case PortFunnel.decodeGenericMessage value of
-                Err error ->
-                    { model | error = Just error }
-                        |> withNoCmd
 
-                Ok genericMessage ->
-                    let
-                        moduleName =
-                            genericMessage.moduleName
-                    in
-                    case Dict.get moduleName funnels of
-                        Nothing ->
-                            { model
-                                | error =
-                                    Just ("Unknown moduleName: " ++ moduleName)
-                            }
-                                |> withNoCmd
+{-| Below here is User Interface.
 
-                        Just funnel ->
-                            case funnel of
-                                EchoFunnel appFunnel ->
-                                    let
-                                        wasLoaded =
-                                            Echo.isLoaded model.state.echo
+I used this as an opportunity for my first trial at `mdgriffith/elm-ui`.
+It's rough, but I think I'm going to learn to like it.
 
-                                        ( mdl, cmd ) =
-                                            process genericMessage appFunnel model
-                                    in
-                                    if
-                                        not wasLoaded
-                                            && Echo.isLoaded mdl.state.echo
-                                    then
-                                        { mdl | useSimulator = False }
-                                            |> withCmds
-                                                [ cmd
-
-                                                -- Test that this gets queued
-                                                , Echo.makeMessage
-                                                    "This should happen second."
-                                                    |> Echo.send cmdPort
-                                                ]
-
-                                    else
-                                        mdl |> withCmd cmd
-
-                                AddXYFunnel appFunnel ->
-                                    process genericMessage appFunnel model
-
-
-findEchoMessages : List Echo.Response -> List Echo.Message
-findEchoMessages responses =
-    List.foldr
-        (\response res ->
-            case response of
-                Echo.MessageResponse message ->
-                    message :: res
-
-                Echo.ListResponse resps ->
-                    List.append
-                        (findEchoMessages resps)
-                        res
-
-                _ ->
-                    res
-        )
-        []
-        responses
-
-
-echoHandler : Echo.Response -> State -> Model -> ( Model, Cmd Msg )
-echoHandler response state model =
-    ( { model
-        | state = state
-        , echoed =
-            case response of
-                Echo.MessageResponse message ->
-                    Echo.toString message :: model.echoed
-
-                Echo.ListResponse responses ->
-                    List.concat
-                        [ Echo.findMessages responses
-                            |> List.map Echo.toString
-                        , model.echoed
-                        ]
-
-                _ ->
-                    model.echoed
-      }
-    , Cmd.none
-    )
-
-
-addXYHandler : AddXY.Response -> State -> Model -> ( Model, Cmd Msg )
-addXYHandler response state model =
-    ( { model
-        | state = state
-        , sums =
-            case response of
-                AddXY.MessageResponse message ->
-                    AddXY.toString message :: model.sums
-
-                _ ->
-                    model.sums
-      }
-    , Cmd.none
-    )
-
-
+-}
 fontSize : Float
 fontSize =
     20

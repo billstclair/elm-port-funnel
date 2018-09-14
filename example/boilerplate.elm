@@ -21,8 +21,8 @@ into `site/elm.js` (with, e.g., the `bin/build-boilerplate` script).
 
 import Browser
 import Dict exposing (Dict)
-import Html exposing (Html, button, div, h1, input, p, span, text)
-import Html.Attributes exposing (checked, style, type_, value)
+import Html exposing (Html, a, button, div, h1, input, p, span, text)
+import Html.Attributes exposing (checked, href, style, type_, value)
 import Html.Events exposing (onCheck, onClick, onInput)
 import Json.Encode as JE exposing (Value)
 import PortFunnel
@@ -349,6 +349,9 @@ update msg modl =
             { modl | error = Nothing }
     in
     case msg of
+        Process value ->
+            processValue value model
+
         SetUseSimulator useSimulator ->
             ( { model | useSimulator = useSimulator }, Cmd.none )
 
@@ -371,10 +374,9 @@ update msg modl =
                 |> Echo.send (getEchoCmdPort model)
             )
 
-        Process value ->
-            processValue value model
 
-
+{-| Finally, make it all visible in the browser.
+-}
 br =
     Html.br [] []
 
@@ -411,5 +413,10 @@ view model =
             , span [] <|
                 List.map (\echoed -> span [] [ br, text echoed ])
                     model.echoed
+            ]
+        , p []
+            [ text "Source code: "
+            , a [ href "https://github.com/billstclair/elm-port-funnel/blob/master/example/boilerplate.elm" ]
+                [ text "boilerplate.elm" ]
             ]
         ]

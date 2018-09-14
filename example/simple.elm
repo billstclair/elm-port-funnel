@@ -26,8 +26,8 @@ e.g., the `bin/build-simple` script, and then aim your browser at
 
 import Browser
 import Dict exposing (Dict)
-import Html exposing (Html, button, div, h1, input, p, span, text)
-import Html.Attributes exposing (style, value)
+import Html exposing (Html, a, button, div, h1, input, p, span, text)
+import Html.Attributes exposing (href, style, value)
 import Html.Events exposing (onClick, onInput)
 import Json.Encode as JE exposing (Value)
 import PortFunnel
@@ -275,6 +275,9 @@ update msg modl =
             { modl | error = Nothing }
     in
     case msg of
+        Process value ->
+            processValue value model
+
         SetEcho echo ->
             ( { model
                 | echo = echo
@@ -294,10 +297,9 @@ update msg modl =
                 |> Echo.send cmdPort
             )
 
-        Process value ->
-            processValue value model
 
-
+{-| Finally, make it all visible in the browser.
+-}
 br =
     Html.br [] []
 
@@ -326,5 +328,10 @@ view model =
             , span [] <|
                 List.map (\echoed -> span [] [ br, text echoed ])
                     model.echoed
+            ]
+        , p []
+            [ text "Source code: "
+            , a [ href "https://github.com/billstclair/elm-port-funnel/blob/master/example/simple.elm" ]
+                [ text "simple.elm" ]
             ]
         ]

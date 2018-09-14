@@ -1,16 +1,24 @@
 # PortFunnel Example and Ports
 
-## Running the Example
+## Running the Examples
 
-You may run the example in `elm reactor`, using simulated ports or compile it into the `site` directory, to use the real ports. To run it in reactor:
+This directory contains three top-level applications:
+
+1. `Main.elm` is the full-fledged example, running at [billstclair.github.io/elm-port-funnel](https://billstclair.github.io/elm-port-funnel/). It shows port detection and simulators for using two modules (`PortFunnel.Echo` and `PortFunnel.AddXY`) through one port pair.
+
+2. `boilerplate.elm` simplifies `Main.elm` by removing the `AddXY` module, and switching to a minimal UI (instead of my first rough trial at using [mdgriffith/elm-ui](https://package.elm-lang.org/packages/mdgriffith/elm-ui/latest)).
+
+3. `simple.elm` is a bare-bones example, showing how to talk through ports to the `Echo` module, but with no simulator support. It's the easiest of the three to understand.
+
+You may run the examples in `elm reactor`, using simulated ports or compile them into the `site` directory, to use the real ports. To run in reactor:
 
     $ git clone https://github.com/billstclair/elm-port-funnel
     $ cd elm-port-funnel
     $ elm reactor
     
-Then aim your web browser at http://localhost:8000/Main.elm
+Then aim your web browser at http://localhost:8000/Main.elm, http://localhost:8000/boilerplate.elm, or http://localhost:8000/simple.elm (this one won't do anything in reactor, since it doesn't support simulation).
 
-To build the example and run it with ports:
+To build the main example and run it with ports:
 
     $ cd .../elm-port-funnel/example
     $ bin/m build   # elm make Main.elm --output site/elm.js
@@ -20,6 +28,8 @@ Then aim your web browser at http://localhost:8000/site/index.html
 
 Or upload the `site` directory to a web server, and aim a browser at the upload directory.
 
+Use `bin/m build-boilerplate` or `bin/m build-simple` to compile one of the other two top-level applications into `site/elm.js`.
+    
 ## PortFunnel Port Setup
 
 This directory contains an example of using the `PortFunnel` module with real ports. A near-image of your site directory is in the `site` sub-directory of this example directory.
@@ -90,7 +100,6 @@ The `PortFunnel.subscribe(...)` call loads the `modules` and hooks them up to `a
 
 The reason I created the `billstclair/elm-port-funnel` package is that adding a new funnel to an existing setup becomes very easy.
 
-On the JavaScript side, you drop the new funnel's JavaScript file into the `site/js/PortFunnel' directory, and add its name to the `modules` array in `site/index.html`.
+On the JavaScript side, you drop the new funnel's JavaScript file into the `site/js/PortFunnel` directory, and add its name to the `modules` array in `site/index.html`.
 
 On the Elm side, you import the new module, add its initial state to your funnel state, create a new `StateAccessors` instance to access the new module's state from your funnel state, make a new simulated port, add the new funnel type to `Funnel`, and `funnels`, send the relevant funnel messages in response to application `Msg`s, and write a handler for the incoming messages from the new funnel. The last two steps are the hardest, and you'd have to do those no matter which port technology you use.
-

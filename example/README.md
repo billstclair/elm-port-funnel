@@ -21,14 +21,14 @@ Then aim your web browser at http://localhost:8000/Main.elm, http://localhost:80
 To build the main example and run it with ports:
 
     $ cd .../elm-port-funnel/example
-    $ bin/m build   # elm make Main.elm --output site/elm.js
+    $ bin/build   # elm make Main.elm --output site/elm.js
     $ elm reactor
     
 Then aim your web browser at http://localhost:8000/site/index.html
 
 Or upload the `site` directory to a web server, and aim a browser at the upload directory.
 
-Use `bin/m build-boilerplate` or `bin/m build-simple` to compile one of the other two top-level applications into `site/elm.js`.
+Use `bin/build-boilerplate` or `bin/build-simple` to compile one of the other two top-level applications into `site/elm.js`.
     
 ## PortFunnel Port Setup
 

@@ -157,66 +157,18 @@ echoHandler response state model =
     )
 
 
-{-| After parsing the `Value` that comes in to `update` with the `Process` msg,
+{-| This is called from `AppFunnel.processValue`.
 
-This function passes the module-specific `cmdPort` and `FunnelSpec` (`AppFunnel`)
-into `PortFunnel` for processing. Note that `substate`, `message`, and `response`
-can all be type variables here, because `PortFunnel.appProcess` just
-passes them through to the module-specific functions in the `AppFunnel`.
+It unboxes the `Funnel` arg, and calls `PortFunnel.appProcess`.
 
 -}
-process : GenericMessage -> AppFunnel substate message response -> Model -> ( Model, Cmd Msg )
-process genericMessage funnel model =
-    case
-        PortFunnel.appProcess cmdPort genericMessage funnel model.state model
-    of
-        Err error ->
-            ( { model | error = Just error }, Cmd.none )
-
-        Ok ( model2, cmd ) ->
-            ( model2, cmd )
-
-
-{-| Here when we've parsed the incoming `GenericMessage`,
-
-and have found the `Funnel` for the module that will process it.
-
--}
-processFunnel : GenericMessage -> Funnel -> Model -> ( Model, Cmd Msg )
-processFunnel genericMessage funnel model =
-    -- Dispatch on the `Funnel` type.
+appTrampoline : GenericMessage -> Funnel -> State -> Model -> Result String ( Model, Cmd Msg )
+appTrampoline genericMessage funnel state model =
+    -- Dispatch on the `Funnel` tag.
     -- This example has only one possibility.
     case funnel of
         EchoFunnel appFunnel ->
-            process genericMessage appFunnel model
-
-
-{-| Called from `update` to process a `Value` from the `subPort`.
--}
-processValue : Value -> Model -> ( Model, Cmd Msg )
-processValue value model =
-    -- Parse the incoming `Value` into a `GenericMessage`.
-    case PortFunnel.decodeGenericMessage value of
-        Err error ->
-            ( { model | error = Just error }, Cmd.none )
-
-        Ok genericMessage ->
-            let
-                moduleName =
-                    genericMessage.moduleName
-            in
-            -- Dispatch on the `moduleName`
-            case Dict.get moduleName funnels of
-                Nothing ->
-                    ( { model
-                        | error =
-                            Just ("Unknown moduleName: " ++ moduleName)
-                      }
-                    , Cmd.none
-                    )
-
-                Just funnel ->
-                    processFunnel genericMessage funnel model
+            PortFunnel.appProcess cmdPort genericMessage appFunnel state model
 
 
 {-| Our model.
@@ -276,7 +228,16 @@ update msg modl =
     in
     case msg of
         Process value ->
-            processValue value model
+            case
+                PortFunnel.processValue funnels appTrampoline value model.state model
+            of
+                Err error ->
+                    ( { model | error = Just error }
+                    , Cmd.none
+                    )
+
+                Ok res ->
+                    res
 
         SetEcho echo ->
             ( { model

@@ -13,7 +13,7 @@
 module PortFunnel exposing
     ( FunnelSpec, ModuleDesc, StateAccessors, GenericMessage
     , makeModuleDesc, getModuleDescName, emptyCommander
-    , send, sendMessage, appProcess, process
+    , send, sendMessage, processValue, appProcess, process
     , encodeGenericMessage, decodeGenericMessage
     , genericMessageDecoder
     , messageToValue, messageToJsonString
@@ -39,7 +39,7 @@ Some very simple JavaScript boilerplate directs `PortFunnel.js` to load and wire
 
 ## API
 
-@docs send, sendMessage, appProcess, process
+@docs send, sendMessage, processValue, appProcess, process
 
 
 ## Low-level conversion between `Value` and `GenericMessage`
@@ -56,6 +56,7 @@ Some very simple JavaScript boilerplate directs `PortFunnel.js` to load and wire
 -}
 
 import Cmd.Extra exposing (addCmd, addCmds, withCmd, withCmds, withNoCmd)
+import Dict exposing (Dict)
 import Json.Decode as JD exposing (Decoder)
 import Json.Encode as JE exposing (Value)
 import List.Extra as LE
@@ -177,9 +178,9 @@ sendMessage moduleDesc cmdPort message =
         |> cmdPort
 
 
-{-| Process a message received from your `Sub port`
+{-| Process a GenericMessage.
 
-This is low-level processing. Most applications will use `appProcess`.
+This is low-level processing. Most applications will call this through `appProcess` via `processValue`.
 
 -}
 process : StateAccessors state substate -> ModuleDesc message substate response -> GenericMessage -> state -> Result String ( state, response )
@@ -202,16 +203,46 @@ process accessors (ModuleDesc moduleDesc) genericMessage state =
                 )
 
 
-genericMessageToCmdPort : (Value -> Cmd msg) -> GenericMessage -> Cmd msg
-genericMessageToCmdPort cmdPort genericMessage =
-    encodeGenericMessage genericMessage
-        |> cmdPort
+{-| Process a `Value` from your subscription port.
+
+    processValue funnels appTrampoline value state model
+
+Parse the `Value` into a `GenericMessage`.
+
+If successful, use the `moduleName` from there to look up a funnel from the `Dict` you provide.
+
+If the lookup succeeds, call your `appTrampoline`, to unbox the `funnel` and call `PortFunnel.appProcess` to do the rest of the processing.
+
+See `example/boilerplate.elm` and `example/simple.elm` for examples of using this.
+
+-}
+processValue : Dict String funnel -> (GenericMessage -> funnel -> state -> model -> Result String ( model, Cmd msg )) -> Value -> state -> model -> Result String ( model, Cmd msg )
+processValue funnels appTrampoline value state model =
+    case decodeGenericMessage value of
+        Err error ->
+            Err error
+
+        Ok genericMessage ->
+            let
+                moduleName =
+                    genericMessage.moduleName
+            in
+            case Dict.get moduleName funnels of
+                Just funnel ->
+                    case
+                        appTrampoline genericMessage funnel state model
+                    of
+                        Err error ->
+                            Err error
+
+                        Ok ( model2, cmd ) ->
+                            Ok ( model2, cmd )
+
+                _ ->
+                    Err <| "Unknown moduleName: " ++ moduleName
 
 
-{-| Once your application has a fully-realized `FunnelSpec` in its hands,
-
-call this to do all the necessary processing.
-
+{-| Finish the processing begun in `processValue`.
 -}
 appProcess : (Value -> Cmd msg) -> GenericMessage -> FunnelSpec state substate message response model msg -> state -> model -> Result String ( model, Cmd msg )
 appProcess cmdPort genericMessage funnel state model =
@@ -223,9 +254,11 @@ appProcess cmdPort genericMessage funnel state model =
 
         Ok ( state2, response ) ->
             let
+                gmToCmdPort gm =
+                    encodeGenericMessage gm |> cmdPort
+
                 cmd =
-                    funnel.commander (genericMessageToCmdPort cmdPort)
-                        response
+                    funnel.commander gmToCmdPort response
 
                 ( model2, cmd2 ) =
                     funnel.handler response state2 model

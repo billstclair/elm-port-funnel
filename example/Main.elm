@@ -214,6 +214,18 @@ getGMCmdPort genericMessage model =
         getAddXYCmdPort model
 
 
+doIsLoaded : Model -> Model
+doIsLoaded model =
+    if not model.wasLoaded && Echo.isLoaded model.state.echo then
+        { model
+            | useSimulator = False
+            , wasLoaded = True
+        }
+
+    else
+        model
+
+
 {-| After the `Echo` module processes a `GenericMessage` into an `Echo.Response`,
 
 this function is called to do something with that response.
@@ -223,25 +235,43 @@ You'll need a separate handler function for each port module.
 -}
 echoHandler : Echo.Response -> State -> Model -> ( Model, Cmd Msg )
 echoHandler response state model =
-    ( { model
-        | state = state
-        , echoed =
-            case response of
-                Echo.MessageResponse message ->
-                    Echo.toString message :: model.echoed
+    let
+        wasLoaded =
+            model.wasLoaded
 
-                Echo.ListResponse responses ->
-                    List.concat
-                        [ Echo.findMessages responses
-                            |> List.map Echo.toString
-                        , model.echoed
-                        ]
+        model2 =
+            doIsLoaded
+                { model
+                    | state = state
+                    , echoed =
+                        case response of
+                            Echo.MessageResponse message ->
+                                Echo.toString message :: model.echoed
 
-                _ ->
-                    model.echoed
-      }
-    , Cmd.none
-    )
+                            Echo.ListResponse responses ->
+                                List.concat
+                                    [ Echo.findMessages responses
+                                        |> List.map Echo.toString
+                                    , model.echoed
+                                    ]
+
+                            _ ->
+                                model.echoed
+                }
+
+        cmd =
+            if wasLoaded || not model2.wasLoaded then
+                Cmd.none
+
+            else
+                -- Test that this gets queued behind
+                -- "If you see this, startup queueing is working."
+                -- sent by `init` below.
+                Echo.makeMessage
+                    "This should happen second."
+                    |> Echo.send cmdPort
+    in
+    ( model2, cmd )
 
 
 {-| Here's the handler for message from the AddXY module's JavaScript.
@@ -262,98 +292,23 @@ addXYHandler response state model =
     )
 
 
-{-| After parsing the `Value` that comes in to `update` with the `Process` msg,
+{-| This is called from `AppFunnel.processValue`.
 
-This function passes the module-specific `cmdPort` and `FunnelSpec` (`AppFunnel`)
-into `PortFunnel` for processing. Note that `substate`, `message`, and `response`
-can all be type variables here, because `PortFunnel.appProcess` just
-passes them through to the module-specific functions in the `AppFunnel`.
+It unboxes the `Funnel` arg, and calls `PortFunnel.appProcess`.
 
 -}
-process : GenericMessage -> AppFunnel substate message response -> Model -> ( Model, Cmd Msg )
-process genericMessage funnel model =
-    case
-        PortFunnel.appProcess (getGMCmdPort genericMessage model)
-            genericMessage
-            funnel
-            model.state
-            model
-    of
-        Err error ->
-            { model | error = Just error } |> withNoCmd
-
-        Ok ( model2, cmd ) ->
-            ( model2, cmd )
-
-
-{-| Here when we've parsed the incoming `GenericMessage`,
-
-and have found the `Funnel` for the module that will process it.
-
--}
-processFunnel : GenericMessage -> Funnel -> Model -> ( Model, Cmd Msg )
-processFunnel genericMessage funnel model =
-    -- Dispatch on the `Funnel` type.
-    -- This example has only one possibility.
+appTrampoline : GenericMessage -> Funnel -> State -> Model -> Result String ( Model, Cmd Msg )
+appTrampoline genericMessage funnel state model =
+    let
+        gmPort =
+            getGMCmdPort genericMessage model
+    in
     case funnel of
-        EchoFunnel appFunnel ->
-            let
-                wasLoaded =
-                    Echo.isLoaded model.state.echo
+        EchoFunnel echoFunnel ->
+            PortFunnel.appProcess cmdPort genericMessage echoFunnel state model
 
-                ( mdl, cmd ) =
-                    process genericMessage appFunnel model
-            in
-            if
-                not wasLoaded
-                    && Echo.isLoaded mdl.state.echo
-            then
-                { mdl | useSimulator = False }
-                    |> withCmds
-                        [ cmd
-
-                        -- Test that this gets queued behind
-                        -- "If you see this, startup queueing is working."
-                        -- sent by `init` below.
-                        , Echo.makeMessage
-                            "This should happen second."
-                            |> Echo.send cmdPort
-                        ]
-
-            else
-                mdl |> withCmd cmd
-
-        -- Many modules send a `Startup` message to notify the Elm code.
-        -- You only need to use one of those for the simulator determination.
-        AddXYFunnel appFunnel ->
-            process genericMessage appFunnel model
-
-
-{-| Called from `update` to process a `Value` from the `subPort`.
--}
-processValue : Value -> Model -> ( Model, Cmd Msg )
-processValue value model =
-    -- Parse the incoming `Value` into a `GenericMessage`.
-    case PortFunnel.decodeGenericMessage value of
-        Err error ->
-            { model | error = Just error }
-                |> withNoCmd
-
-        Ok genericMessage ->
-            let
-                moduleName =
-                    genericMessage.moduleName
-            in
-            case Dict.get moduleName funnels of
-                Nothing ->
-                    { model
-                        | error =
-                            Just ("Unknown moduleName: " ++ moduleName)
-                    }
-                        |> withNoCmd
-
-                Just funnel ->
-                    processFunnel genericMessage funnel model
+        AddXYFunnel addFunnel ->
+            PortFunnel.appProcess cmdPort genericMessage addFunnel state model
 
 
 {-| Our model.
@@ -371,6 +326,7 @@ type alias Model =
     { state : State
     , error : Maybe String
     , useSimulator : Bool
+    , wasLoaded : Bool
     , x : String
     , y : String
     , sums : List String
@@ -393,6 +349,7 @@ init () =
     ( { state = initialState
       , error = Nothing
       , useSimulator = True
+      , wasLoaded = False
       , x = "2"
       , y = "3"
       , sums = []
@@ -430,7 +387,16 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Process value ->
-            processValue value model
+            case
+                PortFunnel.processValue funnels appTrampoline value model.state model
+            of
+                Err error ->
+                    ( { model | error = Just error }
+                    , Cmd.none
+                    )
+
+                Ok res ->
+                    res
 
         SetUseSimulator useSimulator ->
             { model | useSimulator = useSimulator } |> withNoCmd

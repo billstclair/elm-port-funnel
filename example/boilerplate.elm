@@ -167,6 +167,23 @@ getGMCmdPort genericMessage model =
         cmdPort
 
 
+{-| Some funnel modules let you know when their JavaScript has been loaded.
+
+Here's one way to store that in the model, so we can use it to decide whether to use the simulators or the real port.
+
+-}
+doIsLoaded : Model -> Model
+doIsLoaded model =
+    if not model.wasLoaded && Echo.isLoaded model.state.echo then
+        { model
+            | useSimulator = False
+            , wasLoaded = True
+        }
+
+    else
+        model
+
+
 {-| After the `Echo` module processes a `GenericMessage` into an `Echo.Response`,
 
 this function is called to do something with that response.
@@ -193,100 +210,23 @@ echoHandler response state model =
                 _ ->
                     model.echoed
       }
+        |> doIsLoaded
     , Cmd.none
     )
 
 
-{-| After parsing the `Value` that comes in to `update` with the `Process` msg,
+{-| This is called from `AppFunnel.processValue`.
 
-This function passes the module-specific `cmdPort` and `FunnelSpec` (`AppFunnel`)
-into `PortFunnel` for processing. Note that `substate`, `message`, and `response`
-can all be type variables here, because `PortFunnel.appProcess` just
-passes them through to the module-specific functions in the `AppFunnel`.
+It unboxes the `Funnel` arg, and calls `PortFunnel.appProcess`.
 
 -}
-process : GenericMessage -> AppFunnel substate message response -> Model -> ( Model, Cmd Msg )
-process genericMessage funnel model =
-    case
-        PortFunnel.appProcess (getGMCmdPort genericMessage model)
-            genericMessage
-            funnel
-            model.state
-            model
-    of
-        Err error ->
-            ( { model | error = Just error }, Cmd.none )
-
-        Ok ( model2, cmd ) ->
-            ( model2, cmd )
-
-
-{-| Here when we've parsed the incoming `GenericMessage`,
-
-and have found the `Funnel` for the module that will process it.
-
--}
-processFunnel : GenericMessage -> Funnel -> Model -> ( Model, Cmd Msg )
-processFunnel genericMessage funnel model =
-    -- Dispatch on the `Funnel` type.
+appTrampoline : GenericMessage -> Funnel -> State -> Model -> Result String ( Model, Cmd Msg )
+appTrampoline genericMessage funnel state model =
+    -- Dispatch on the `Funnel` tag.
     -- This example has only one possibility.
     case funnel of
         EchoFunnel appFunnel ->
-            let
-                wasLoaded =
-                    Echo.isLoaded model.state.echo
-
-                ( mdl, cmd ) =
-                    process genericMessage appFunnel model
-            in
-            if
-                not wasLoaded
-                    && Echo.isLoaded mdl.state.echo
-            then
-                -- If the `Echo` module was not loaded before this
-                -- message came in, and the message changed that, then
-                -- turn the simulator off. The `Startup` message
-                -- happens only once, right after the JavaScript for
-                -- the module is loaded.
-                -- Real code will likely just assume that the ports
-                -- are OK, and use them, or wire in use of the simulator
-                -- during development.
-                -- `PortModule.js` queues up messages that arrive before
-                -- the associated module JS code has loaded.
-                ( { mdl | useSimulator = False }
-                , cmd
-                )
-
-            else
-                ( mdl, cmd )
-
-
-{-| Called from `update` to process a `Value` from the `subPort`.
--}
-processValue : Value -> Model -> ( Model, Cmd Msg )
-processValue value model =
-    -- Parse the incoming `Value` into a `GenericMessage`.
-    case PortFunnel.decodeGenericMessage value of
-        Err error ->
-            ( { model | error = Just error }, Cmd.none )
-
-        Ok genericMessage ->
-            let
-                moduleName =
-                    genericMessage.moduleName
-            in
-            -- Dispatch on the `moduleName`
-            case Dict.get moduleName funnels of
-                Nothing ->
-                    ( { model
-                        | error =
-                            Just ("Unknown moduleName: " ++ moduleName)
-                      }
-                    , Cmd.none
-                    )
-
-                Just funnel ->
-                    processFunnel genericMessage funnel model
+            PortFunnel.appProcess cmdPort genericMessage appFunnel state model
 
 
 {-| Our model.
@@ -302,6 +242,7 @@ type alias Model =
     { state : State
     , error : Maybe String
     , useSimulator : Bool
+    , wasLoaded : Bool
     , echo : String
     , echoed : List String
     }
@@ -321,6 +262,7 @@ init () =
     ( { state = initialState
       , error = Nothing
       , useSimulator = True
+      , wasLoaded = False
       , echo = "foo"
       , echoed = []
       }
@@ -350,7 +292,16 @@ update msg modl =
     in
     case msg of
         Process value ->
-            processValue value model
+            case
+                PortFunnel.processValue funnels appTrampoline value model.state model
+            of
+                Err error ->
+                    ( { model | error = Just error }
+                    , Cmd.none
+                    )
+
+                Ok res ->
+                    res
 
         SetUseSimulator useSimulator ->
             ( { model | useSimulator = useSimulator }, Cmd.none )

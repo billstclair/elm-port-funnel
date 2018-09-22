@@ -167,8 +167,8 @@ appTrampoline genericMessage funnel state model =
     -- Dispatch on the `Funnel` tag.
     -- This example has only one possibility.
     case funnel of
-        EchoFunnel appFunnel ->
-            PortFunnel.appProcess cmdPort genericMessage appFunnel state model
+        EchoFunnel echoFunnel ->
+            PortFunnel.appProcess cmdPort genericMessage echoFunnel state model
 
 
 {-| Our model.

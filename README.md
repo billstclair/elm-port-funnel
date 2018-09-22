@@ -22,7 +22,7 @@ The README in the [example directory](https://github.com/billstclair/elm-port-fu
 
   An interface to the `localStorage` mechanism, for persistent storage.
 
-* [billstclair/elm-websocket-client](https://package.elm-lang.org/packages/billstclair/elm-websocket-client/latest) (not yet updated, but soon)
+* [billstclair/elm-websocket-client](https://package.elm-lang.org/packages/billstclair/elm-websocket-client/latest)
 
   A port-based replacement for the Elm 0.18 `elm-lang/websocket` package, which has not yet been upgraded to Elm 0.19.
 

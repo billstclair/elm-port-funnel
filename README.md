@@ -26,6 +26,10 @@ The README in the [example directory](https://github.com/billstclair/elm-port-fu
 
   A port-based replacement for the Elm 0.18 `elm-lang/websocket` package, which has not yet been upgraded to Elm 0.19.
 
+* [billstclair/elm-geolocation](https://package.elm-lang.org/packages/billstclair/elm-geolocation/latest)
+
+  A port-based replacement for the Elm 0.18 `elm-lang/geolocation` package, which was not upgraded when Elm 0.19 shipped, and may never be.
+
 ## Credit
 
 Thank you to Murphy Randall (@splodingsocks on Twitter and Elm Slack), whose [elm-conf 2017 talk](https://www.youtube.com/watch?v=P3pL85n9_5s) introduced me to the idea that `billstclair/elm-port-funnel` takes to its logical extreme.

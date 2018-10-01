@@ -37,181 +37,174 @@ import Element.Font as Font exposing (bold, size)
 import Element.Input as Input exposing (Label)
 import Html exposing (Html)
 import Json.Encode as JE exposing (Value)
-import PortFunnel
-    exposing
-        ( FunnelSpec
-        , GenericMessage
-        , ModuleDesc
-        , StateAccessors
-        )
 import PortFunnel.AddXY as AddXY
 import PortFunnel.Echo as Echo
+import PortFunnels exposing (FunnelDict, Handler(..), State)
 
 
-{-| Here's where you define your ports.
 
-You can name them something besides `cmdPort` and `subPort`,
-but then you have to change the call to `PortFunnel.subscribe()`
-in `site/index.html`. Why bother?
+{- This section contains boilerplate that you'll always need.
 
-If you run the application in `elm reactor`, these will go nowhere.
+   First, copy PortFunnels.elm into your project, and modify it
+   to support all the funnel modules you use.
 
+   Then update the `handlers` list with an entry for each funnel.
+
+   Those handler functions are the meat of your interaction with each
+   funnel module.
 -}
-port cmdPort : Value -> Cmd msg
 
 
-port subPort : (Value -> msg) -> Sub msg
+handlers : List (Handler Model Msg)
+handlers =
+    [ EchoHandler echoHandler
+    , AddXYHandler addXYHandler
+    ]
 
 
-{-| You may have other subscriptions, but you need at least this one,
-or nothing sent back from the port JavaScript will get to your code.
--}
 subscriptions : Model -> Sub Msg
-subscriptions model =
-    subPort Process
+subscriptions =
+    PortFunnels.subscriptions Process
 
 
-{-| Support for simulators.
+funnelDict : FunnelDict Model Msg
+funnelDict =
+    PortFunnels.makeFunnelDict handlers
 
-You'll need something like this for each module you want to be able to simulate.
 
-Totally optional, but I find it nice to be able to simulator in `elm reactor`.
+{-| Get a possibly simulated output port.
+-}
+getCmdPort : String -> Model -> (Value -> Cmd Msg)
+getCmdPort moduleName model =
+    PortFunnels.getCmdPort Process moduleName model.useSimulator
+
+
+{-| The real output port.
+-}
+cmdPort : Value -> Cmd Msg
+cmdPort =
+    PortFunnels.getCmdPort Process "" False
+
+
+{-| Our model.
+
+`state` contains the port module state.
+`error` is used to report parsing and processing errors.
+`useSimulator` controls whether we use the simulator(s) or the real port.
+`x` and `y` are the inputs for the `AddXY` module.
+`sums` is a list of its outputs.
+`echo` is the input for the `Echo` module.
+`echoed` is a list of its outputs.
 
 -}
-simulatedEchoCmdPort : Value -> Cmd Msg
-simulatedEchoCmdPort =
-    Echo.makeSimulatedCmdPort Process
-
-
-simulatedAddXYCmdPort : Value -> Cmd Msg
-simulatedAddXYCmdPort =
-    AddXY.makeSimulatedCmdPort Process
-
-
-{-| You may want simulator use to be automatic.
-
-If so, keep a `useSimulator` flag in your `Model`, and check it here.
-
--}
-getEchoCmdPort : Model -> (Value -> Cmd Msg)
-getEchoCmdPort model =
-    if model.useSimulator then
-        simulatedEchoCmdPort
-
-    else
-        cmdPort
-
-
-getAddXYCmdPort : Model -> (Value -> Cmd Msg)
-getAddXYCmdPort model =
-    if model.useSimulator then
-        simulatedAddXYCmdPort
-
-    else
-        cmdPort
-
-
-{-| You need to store the state of each module you use.
--}
-type alias State =
-    { echo : Echo.State
-    , addxy : AddXY.State
+type alias Model =
+    { state : State
+    , error : Maybe String
+    , useSimulator : Bool
+    , wasLoaded : Bool
+    , x : String
+    , y : String
+    , sums : List String
+    , echo : String
+    , echoed : List String
     }
 
 
-{-| And you need to initialize that state.
-
-Some modules have parmeters to their `initialState` functions.
-
-In that case, you may have to delay this packaging until you know the
-values for those parameters.
-
--}
-initialState : State
-initialState =
-    { echo = Echo.initialState
-    , addxy = AddXY.initialState
-    }
+main =
+    Browser.element
+        { init = init
+        , view = view
+        , update = update
+        , subscriptions = subscriptions
+        }
 
 
-{-| `StateAccessors`, `FunnelSpec`, `ModuleDesc`, `commander`, and handlers
-
-are all packaged up for each port module, and indexed so they can
-be easily looked up by `moduleName` when messages come in from the
-subscription port.
-
-The `ModuleDesc` and `commander` are usually exposed by each port module. The others are defined by your application.
-
-Here are the `StateAccessors` for the `Echo` module.
-
--}
-echoAccessors : StateAccessors State Echo.State
-echoAccessors =
-    StateAccessors .echo (\substate state -> { state | echo = substate })
-
-
-{-| And for the `AddXY` module.
--}
-addxyAccessors : StateAccessors State AddXY.State
-addxyAccessors =
-    StateAccessors .addxy (\substate state -> { state | addxy = substate })
+init : () -> ( Model, Cmd Msg )
+init () =
+    ( { state = PortFunnels.initialState
+      , error = Nothing
+      , useSimulator = True
+      , wasLoaded = False
+      , x = "2"
+      , y = "3"
+      , sums = []
+      , echo = "foo"
+      , echoed = []
+      }
+    , Echo.makeMessage "If you see this, startup queueing is working."
+        |> Echo.send cmdPort
+    )
 
 
-{-| An `AppFunnel` is a `FunnelSpec` with the `state`, `model`, and `msg` made concrete.
--}
-type alias AppFunnel substate message response =
-    FunnelSpec State substate message response Model Msg
+{-| The `Process` message handles messages coming in from the subscription port.
 
-
-{-| A `Funnel` tags a module-specific `FunnelSpec`,
-
-with all the variable types made concrete.
+All the others are application specific.
 
 -}
-type Funnel
-    = EchoFunnel (AppFunnel Echo.State Echo.Message Echo.Response)
-    | AddXYFunnel (AppFunnel AddXY.State AddXY.Message AddXY.Response)
+type Msg
+    = Process Value
+    | SetUseSimulator Bool
+    | SetX String
+    | SetY String
+    | Add
+    | Multiply
+    | SetEcho String
+    | Echo
 
 
-{-| Finally, a `Dict` mapping `moduleName` to tagged concrete `FunnelSpec`.
--}
-funnels : Dict String Funnel
-funnels =
-    Dict.fromList
-        [ ( Echo.moduleName
-          , EchoFunnel <|
-                FunnelSpec echoAccessors
-                    Echo.moduleDesc
-                    Echo.commander
-                    echoHandler
-          )
-        , ( AddXY.moduleName
-          , AddXYFunnel <|
-                FunnelSpec addxyAccessors
-                    AddXY.moduleDesc
-                    AddXY.commander
-                    addXYHandler
-          )
-        ]
+update : Msg -> Model -> ( Model, Cmd Msg )
+update msg model =
+    case msg of
+        Process value ->
+            case
+                PortFunnels.processValue funnelDict value model.state model
+            of
+                Err error ->
+                    ( { model | error = Just error }
+                    , Cmd.none
+                    )
+
+                Ok res ->
+                    res
+
+        SetUseSimulator useSimulator ->
+            { model | useSimulator = useSimulator } |> withNoCmd
+
+        SetX x ->
+            { model | x = x } |> withNoCmd
+
+        SetY y ->
+            { model | y = y } |> withNoCmd
+
+        SetEcho echo ->
+            { model | echo = echo } |> withNoCmd
+
+        Add ->
+            model
+                |> withCmd
+                    (AddXY.makeAddMessage (toInt 0 model.x) (toInt 0 model.y)
+                        |> AddXY.send (getCmdPort AddXY.moduleName model)
+                    )
+
+        Multiply ->
+            model
+                |> withCmd
+                    (AddXY.makeMultiplyMessage (toInt 0 model.x) (toInt 0 model.y)
+                        |> AddXY.send (getCmdPort AddXY.moduleName model)
+                    )
+
+        Echo ->
+            model
+                |> withCmd
+                    (Echo.makeMessage model.echo
+                        |> Echo.send (getCmdPort Echo.moduleName model)
+                    )
 
 
-{-| Turn the `moduleName` inside a `GenericMessage` into the port
-
-to which to send its messages. This only needs to be here if you're
-doing simulation. Otherwise, just use the real `cmdPort`.
-
--}
-getGMCmdPort : GenericMessage -> Model -> (Value -> Cmd Msg)
-getGMCmdPort genericMessage model =
-    let
-        moduleName =
-            genericMessage.moduleName
-    in
-    if moduleName == Echo.moduleName then
-        getEchoCmdPort model
-
-    else
-        getAddXYCmdPort model
+toInt : Int -> String -> Int
+toInt default string =
+    String.toInt string
+        |> Maybe.withDefault default
 
 
 doIsLoaded : Model -> Model
@@ -290,146 +283,6 @@ addXYHandler response state model =
       }
     , Cmd.none
     )
-
-
-{-| This is called from `AppFunnel.processValue`.
-
-It unboxes the `Funnel` arg, and calls `PortFunnel.appProcess`.
-
--}
-appTrampoline : GenericMessage -> Funnel -> State -> Model -> Result String ( Model, Cmd Msg )
-appTrampoline genericMessage funnel state model =
-    let
-        gmPort =
-            getGMCmdPort genericMessage model
-    in
-    case funnel of
-        EchoFunnel echoFunnel ->
-            PortFunnel.appProcess cmdPort genericMessage echoFunnel state model
-
-        AddXYFunnel addFunnel ->
-            PortFunnel.appProcess cmdPort genericMessage addFunnel state model
-
-
-{-| Our model.
-
-`state` contains the port module state.
-`error` is used to report parsing and processing errors.
-`useSimulator` controls whether we use the simulator(s) or the real port.
-`x` and `y` are the inputs for the `AddXY` module.
-`sums` is a list of its outputs.
-`echo` is the input for the `Echo` module.
-`echoed` is a list of its outputs.
-
--}
-type alias Model =
-    { state : State
-    , error : Maybe String
-    , useSimulator : Bool
-    , wasLoaded : Bool
-    , x : String
-    , y : String
-    , sums : List String
-    , echo : String
-    , echoed : List String
-    }
-
-
-main =
-    Browser.element
-        { init = init
-        , view = view
-        , update = update
-        , subscriptions = subscriptions
-        }
-
-
-init : () -> ( Model, Cmd Msg )
-init () =
-    ( { state = initialState
-      , error = Nothing
-      , useSimulator = True
-      , wasLoaded = False
-      , x = "2"
-      , y = "3"
-      , sums = []
-      , echo = "foo"
-      , echoed = []
-      }
-    , Echo.makeMessage "If you see this, startup queueing is working."
-        |> Echo.send cmdPort
-    )
-
-
-{-| The `Process` message handles messages coming in from the subscription port.
-
-All the others are application specific.
-
--}
-type Msg
-    = Process Value
-    | SetUseSimulator Bool
-    | SetX String
-    | SetY String
-    | Add
-    | Multiply
-    | SetEcho String
-    | Echo
-
-
-toInt : Int -> String -> Int
-toInt default string =
-    String.toInt string
-        |> Maybe.withDefault default
-
-
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
-    case msg of
-        Process value ->
-            case
-                PortFunnel.processValue funnels appTrampoline value model.state model
-            of
-                Err error ->
-                    ( { model | error = Just error }
-                    , Cmd.none
-                    )
-
-                Ok res ->
-                    res
-
-        SetUseSimulator useSimulator ->
-            { model | useSimulator = useSimulator } |> withNoCmd
-
-        SetX x ->
-            { model | x = x } |> withNoCmd
-
-        SetY y ->
-            { model | y = y } |> withNoCmd
-
-        SetEcho echo ->
-            { model | echo = echo } |> withNoCmd
-
-        Add ->
-            model
-                |> withCmd
-                    (AddXY.makeAddMessage (toInt 0 model.x) (toInt 0 model.y)
-                        |> AddXY.send (getAddXYCmdPort model)
-                    )
-
-        Multiply ->
-            model
-                |> withCmd
-                    (AddXY.makeMultiplyMessage (toInt 0 model.x) (toInt 0 model.y)
-                        |> AddXY.send (getAddXYCmdPort model)
-                    )
-
-        Echo ->
-            model
-                |> withCmd
-                    (Echo.makeMessage model.echo
-                        |> Echo.send (getEchoCmdPort model)
-                    )
 
 
 {-| Below here is User Interface.

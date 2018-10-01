@@ -2,18 +2,18 @@
 
 ## Running the Examples
 
-This directory contains three top-level applications:
+This directory contains three top-level Elm program files:
 
-1. `Main.elm` is the full-fledged example, running at [billstclair.github.io/elm-port-funnel](https://billstclair.github.io/elm-port-funnel/). It shows port detection and simulators for using two modules (`PortFunnel.Echo` and `PortFunnel.AddXY`) through one port pair.
+1. `Main.elm` is an example, running at [billstclair.github.io/elm-port-funnel](https://billstclair.github.io/elm-port-funnel/). It shows port detection and simulators for using two modules (`PortFunnel.Echo` and `PortFunnel.AddXY`) through one port pair.
 
-2. `boilerplate.elm` simplifies `Main.elm` by removing the `AddXY` module, and switching to a minimal UI (instead of my first rough trial at using [mdgriffith/elm-ui](https://package.elm-lang.org/packages/mdgriffith/elm-ui/latest)).
+   It contains a short "boilerplate" section at the top, referencing functions in the `PortFunnels` module.
 
-3. `simple.elm` is a bare-bones example, showing how to talk through ports to the `Echo` module, but with no simulator support. It's the easiest of the three to understand.
+2. `PortFunnels.elm` is a file for you to copy into your application and modify so that it uses all the port funnel modules you need. It should be pretty obvious how to do that. It also contains the `port` definitions for the two ports used to communicate with the JavaScript code.
 
 You may run the examples in `elm reactor`, using simulated ports or compile them into the `site` directory, to use the real ports. To run in reactor:
 
     $ git clone https://github.com/billstclair/elm-port-funnel
-    $ cd elm-port-funnel
+    $ cd elm-port-funnel/example
     $ elm reactor
     
 Then aim your web browser at http://localhost:8000/Main.elm, http://localhost:8000/boilerplate.elm, or http://localhost:8000/simple.elm (this one won't do anything in reactor, since it doesn't support simulation).
@@ -28,8 +28,6 @@ Then aim your web browser at http://localhost:8000/site/index.html
 
 Or upload the `site` directory to a web server, and aim a browser at the upload directory.
 
-Use `bin/build-boilerplate` or `bin/build-simple` to compile one of the other two top-level applications into `site/elm.js`.
-    
 ## PortFunnel Port Setup
 
 This directory contains an example of using the `PortFunnel` module with real ports. A near-image of your site directory is in the `site` sub-directory of this example directory.
@@ -86,7 +84,7 @@ It also loads `js/PortFunnel.js`, which contains the top-level initialization an
 
 This code assumes your top-level application module is named `Main`. If you named it something else, change the `mainModule` setting to whatever that is.
 
-It also assumes that the `<div>` you want to replace with Elm code is named `elm` (as appears just a little earlier in `index.html`. Again, if you like to use a different `<div>`, change that.
+It also assumes that the `<div>` you want to replace with Elm code has an `id` of `elm` (as appears just a little earlier in `index.html`. Again, if you like to use a different `id`, change that.
 
 If you need to pass a flag to your top-level `init` function, add it to the `init` call.
 

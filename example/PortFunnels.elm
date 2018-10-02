@@ -137,16 +137,24 @@ simulatedPortDict =
 It unboxes the `Funnel` arg, and calls `PortFunnel.appProcess`.
 
 -}
-appTrampoline : GenericMessage -> Funnel model msg -> State -> model -> Result String ( model, Cmd msg )
-appTrampoline genericMessage funnel state model =
+appTrampoline : (String -> model -> (Value -> Cmd msg)) -> GenericMessage -> Funnel model msg -> State -> model -> Result String ( model, Cmd msg )
+appTrampoline portGetter genericMessage funnel state model =
     -- Dispatch on the `Funnel` tag.
     -- This example has only one possibility.
     case funnel of
         EchoFunnel appFunnel ->
-            PortFunnel.appProcess cmdPort genericMessage appFunnel state model
+            PortFunnel.appProcess (portGetter Echo.moduleName model)
+                genericMessage
+                appFunnel
+                state
+                model
 
         AddXYFunnel appFunnel ->
-            PortFunnel.appProcess cmdPort genericMessage appFunnel state model
+            PortFunnel.appProcess (portGetter AddXY.moduleName model)
+                genericMessage
+                appFunnel
+                state
+                model
 
 
 {-| Here are the two ports used to communicate with all the backend JavaScript.
@@ -200,7 +208,7 @@ Create one with `makeFunnelDict`. Pass it to `processValue`.
 
 -}
 type alias FunnelDict model msg =
-    Dict String (Funnel model msg)
+    ( Dict String (Funnel model msg), String -> model -> (Value -> Cmd msg) )
 
 
 {-| Make a `Dict` mapping `moduleName` to tagged concrete `FunnelSpec`.
@@ -211,14 +219,16 @@ The `Handler` list is a list of all of your handlers. E.g. for this example, it 
         [ EchoHandler echoHandler
         , AddXYHandler addXYHandler
         ]
+        getCmdPort
 
 Where `echoHandler` and `addXYHandler` are functions in your main application module to handle responses.
 
 -}
-makeFunnelDict : List (Handler model msg) -> FunnelDict model msg
-makeFunnelDict handlers =
-    List.map handlerToFunnel handlers
-        |> Dict.fromList
+makeFunnelDict : List (Handler model msg) -> (String -> model -> (Value -> Cmd msg)) -> FunnelDict model msg
+makeFunnelDict handlers portGetter =
+    ( List.map handlerToFunnel handlers |> Dict.fromList
+    , portGetter
+    )
 
 
 {-| Process a value coming in through the `subPort`.
@@ -227,5 +237,5 @@ The `FunnelDict` is the result of calling `makeFunnelDict`.
 
 -}
 processValue : FunnelDict model msg -> Value -> State -> model -> Result String ( model, Cmd msg )
-processValue funnelDict value state model =
-    PortFunnel.processValue funnelDict appTrampoline value state model
+processValue ( funnelDict, portGetter ) value state model =
+    PortFunnel.processValue funnelDict (appTrampoline portGetter) value state model

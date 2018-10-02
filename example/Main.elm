@@ -69,7 +69,7 @@ subscriptions =
 
 funnelDict : FunnelDict Model Msg
 funnelDict =
-    PortFunnels.makeFunnelDict handlers
+    PortFunnels.makeFunnelDict handlers getCmdPort
 
 
 {-| Get a possibly simulated output port.

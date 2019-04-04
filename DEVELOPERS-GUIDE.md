@@ -8,9 +8,9 @@ Copy one `.js` file into the `js/PortFunnel` directory, or wherever else they've
 
 `PortFunnel.sub` is the user's subscription port. It has a `send` property, a function of one argument, which you may call to send a value in to that port. That value (and the return value of the dispatch function) must be of the form:
 
-    { module: &lt;moduleName>,
-      tag: &lt;message tag>,
-      args: &lt;anything your decoder can grok>
+    { module: <moduleName>,
+      tag: <message tag>,
+      args: <anything your decoder can grok>
     }
     
 Here's an example from [AddXY.js](example/site/js/PortFunnel/AddXY.js):

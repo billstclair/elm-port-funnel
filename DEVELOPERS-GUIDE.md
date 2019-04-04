@@ -4,7 +4,7 @@ What a user should expect from a module that plugs into the `PortFunnel` library
 
 ## Simple JavaScript install
 
-Copy one `.js` file into the `js/PortFunnel` directory, or wherever else they've decided to store them. If your module is named `MyModule`, that JS file should be named "`MyModule.js`. It should create NO top-level JS variables. When it loads, it must set `PortFunnel.modules[&lt;moduleName>].cmd` to a dispatch function of two args, `tag` and `args`, which returns a value to be sent back to the user, or `null` to not send anything.
+Copy one `.js` file into the `js/PortFunnel` directory, or wherever else they've decided to store them. If your module is named `MyModule`, that JS file should be named "`MyModule.js`. It should create NO top-level JS variables. When it loads, it must set `PortFunnel.modules[<moduleName>].cmd` to a dispatch function of two args, `tag` and `args`, which returns a value to be sent back to the user, or `null` to not send anything.
 
 `PortFunnel.sub` is the user's subscription port. It has a `send` property, a function of one argument, which you may call to send a value in to that port. That value (and the return value of the dispatch function) must be of the form:
 

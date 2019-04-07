@@ -2,7 +2,7 @@
 //
 // Echo.js
 // An example PortFunnel port that echoes its input.
-// Copyright (c) 2018 Bill St. Clair <billstclair@gmail.com>
+// Copyright (c) 2018-2019 Bill St. Clair <billstclair@gmail.com>
 // Some rights reserved.
 // Distributed under the MIT License
 // See LICENSE
@@ -10,17 +10,28 @@
 //////////////////////////////////////////////////////////////////////
 
 
-(function() {
+(function(scope) {
   var moduleName = 'Echo';
-  var sub = PortFunnel.sub;
+  var sub;
 
-  PortFunnel.modules[moduleName].cmd = dispatcher;
+  function init() {
+    var PortFunnel = scope.PortFunnel;
+    if (!PortFunnel || !PortFunnel.sub || !PortFunnel.modules) {
+      // Loop until PortFunnel.js has initialized itself.
+      setTimeout(init, 10);
+      return;
+    }
+    
+    sub = PortFunnel.sub;
+    PortFunnel.modules[moduleName] = { cmd: dispatcher };
 
-  // Let the Elm code know we've started.
-  sub.send({ module: moduleName,
-             tag: "startup",
-             args: null
-           });
+    // Let the Elm code know we've started.
+    sub.send({ module: moduleName,
+               tag: "startup",
+               args: null
+             });
+  }
+  init();
 
   function dispatcher(tag, args) {
     return { module: moduleName,
@@ -28,4 +39,4 @@
              args: args
            };
   }
-})();
+})(this);

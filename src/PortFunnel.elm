@@ -11,7 +11,7 @@
 
 
 module PortFunnel exposing
-    ( FunnelSpec, ModuleDesc, StateAccessors, GenericMessage
+    ( FunnelSpec, ModuleDesc, StateAccessors, GenericMessage, JSVersion
     , makeModuleDesc, getModuleDescName, emptyCommander
     , send, sendMessage, processValue, appProcess, process
     , encodeGenericMessage, decodeGenericMessage
@@ -29,7 +29,7 @@ Some very simple JavaScript boilerplate directs `PortFunnel.js` to load and wire
 
 ## Types
 
-@docs FunnelSpec, ModuleDesc, StateAccessors, GenericMessage
+@docs FunnelSpec, ModuleDesc, StateAccessors, GenericMessage, JSVersion
 
 
 ## PortFunnel-aware Modules
@@ -443,3 +443,12 @@ type Message
         { forModule : String
         , success : Bool
         }
+
+
+{-| This is used to force a major version bump when the JS changes.
+
+You'll usually not use it for anything.
+
+-}
+type alias JSVersion =
+    { v4_1 : () }

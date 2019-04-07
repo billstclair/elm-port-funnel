@@ -17,6 +17,8 @@
       -->
     <script type='text/javascript' src='elm.js'></script>
     <script type='text/javascript' src='js/PortFunnel.js'></script>
+    <script type='text/javascript' src='js/PortFunnel/AddXY.js'></script>
+    <script type='text/javascript' src='js/PortFunnel/Echo.js'></script>
   </head>
   <body>
     <div id='elm'></div>
@@ -34,16 +36,11 @@ var app = Elm[mainModule].init({
 // If you need to use something different, they can be passed
 // as the 'portNames' and 'moduleDirectory' properties of
 // the second parameter to PortFunnel.subscribe() below.
-//var portNames = ['cmdPort', 'subPort'];
-//var moduleDirectory = 'js/PortFunnel';
+// var portNames = ['cmdPort', 'subPort'];
+// PortFunnel.subscribe(app, { portNames: portNames });
 
-// PortFunnel.subscribe will load js/PortFunnel/<module>.js,
-// for each module in this list.
-// Put `Echo` last, so that its `Startup` message will let you know
-// that all the JavaScript has been loaded.
-var modules = ['AddXY', 'Echo'];
+PortFunnel.subscribe(app);
 
-PortFunnel.subscribe(app, {modules: modules});
     </script>
   </body>
 </html>
